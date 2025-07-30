@@ -25,6 +25,26 @@ The AZ-104 exam validates your skills as an Azure Administrator. It covers subsc
 
 ### Azure Active Directory (Azure AD / Entra ID)
 
+#### Concepts Fondamentaux
+
+**Qu'est-ce qu'Azure AD ?**
+Azure Active Directory (maintenant appelé Microsoft Entra ID) est le service d'identité et d'accès basé sur le cloud de Microsoft. Il permet aux utilisateurs de se connecter et d'accéder aux ressources internes et externes.
+
+**Tenants et Directories**
+- **Tenant** : Une instance dédiée d'Azure AD qui représente une organisation
+- **Directory** : Le répertoire d'identités dans un tenant
+- Chaque tenant a un domaine principal (ex: contoso.onmicrosoft.com)
+
+**Types d'Utilisateurs**
+- **Utilisateurs Cloud** : Créés directement dans Azure AD
+- **Utilisateurs Synchronisés** : Synchronisés depuis Active Directory local
+- **Utilisateurs Invités** : Utilisateurs externes invités via B2B
+
+**Groupes et Unités Administratives**
+- **Groupes de Sécurité** : Pour gérer les permissions
+- **Groupes Microsoft 365** : Pour la collaboration
+- **Unités Administratives** : Pour déléguer l'administration
+
 #### Key Concepts
 - Tenants and directories
 - Users, groups, and administrative units
@@ -119,6 +139,26 @@ Get-AzureADGroupMember -ObjectId "group-object-id"
 
 ### Role-Based Access Control (RBAC)
 
+#### Concepts RBAC
+
+**Qu'est-ce que RBAC ?**
+Le contrôle d'accès basé sur les rôles (RBAC) est un système d'autorisation qui permet de gérer l'accès aux ressources Azure en attribuant des rôles appropriés aux utilisateurs, groupes et services.
+
+**Principes RBAC**
+- **Principe du moindre privilège** : Accorder uniquement les permissions nécessaires
+- **Séparation des responsabilités** : Répartir les tâches administratives
+- **Accès juste à temps** : Accorder l'accès temporairement si nécessaire
+
+**Hiérarchie des Scopes**
+1. **Management Group** : Plus haut niveau, affecte plusieurs abonnements
+2. **Subscription** : Niveau d'abonnement
+3. **Resource Group** : Groupe de ressources
+4. **Resource** : Ressource individuelle
+
+**Types de Rôles**
+- **Built-in Roles** : Rôles prédéfinis par Microsoft
+- **Custom Roles** : Rôles personnalisés créés par l'organisation
+
 #### Built-in Roles
 - **Owner:** Full access including access management
 - **Contributor:** Full access except access management
@@ -177,6 +217,28 @@ Remove-AzRoleAssignment -SignInName "user@domain.com" -RoleDefinitionName "Virtu
 
 ### Azure Policy
 
+#### Concepts Azure Policy
+
+**Qu'est-ce qu'Azure Policy ?**
+Azure Policy est un service qui vous permet de créer, assigner et gérer des politiques pour contrôler et organiser vos ressources Azure. Il garantit que vos ressources restent conformes aux normes de votre entreprise.
+
+**Types de Politiques**
+- **Built-in Policies** : Politiques prédéfinies par Microsoft
+- **Custom Policies** : Politiques personnalisées créées par l'organisation
+- **Initiative Policies** : Groupes de politiques liées
+
+**Effets des Politiques**
+- **Deny** : Empêche la création/modification de ressources non conformes
+- **Audit** : Permet l'action mais enregistre la non-conformité
+- **Append** : Ajoute des propriétés aux ressources
+- **DeployIfNotExists** : Déploie des ressources si elles n'existent pas
+- **Modify** : Modifie les propriétés des ressources existantes
+
+**Évaluation des Politiques**
+- **Automatique** : Évaluation lors de la création/modification
+- **Manuelle** : Déclenchement manuel d'une évaluation
+- **Compliance** : Suivi de la conformité des ressources
+
 #### Policy Commands
 
 **Azure CLI:**
@@ -226,6 +288,27 @@ Get-AzPolicyState
 
 ### Subscription Management
 
+#### Concepts de Gestion des Abonnements
+
+**Qu'est-ce qu'un Abonnement Azure ?**
+Un abonnement Azure est un accord avec Microsoft pour utiliser des services cloud Azure. Il définit comment les ressources Azure sont facturées et gérées.
+
+**Types d'Abonnements**
+- **Free Account** : Compte gratuit avec crédits limités
+- **Pay-As-You-Go** : Paiement à l'usage
+- **Enterprise Agreement** : Accord d'entreprise avec remises
+- **Cloud Solution Provider** : Via un partenaire
+
+**Management Groups**
+- **Hiérarchie** : Organisation logique des abonnements
+- **Héritage** : Les politiques et rôles sont hérités
+- **Gouvernance** : Centralisation de la gestion
+
+**Ressources et Facturation**
+- **Resource Groups** : Groupement logique des ressources
+- **Tags** : Métadonnées pour l'organisation et la facturation
+- **Cost Management** : Suivi et optimisation des coûts
+
 **Azure CLI:**
 ```bash
 # List subscriptions
@@ -272,7 +355,46 @@ Get-AzManagementGroup
 
 ## 💾 2. Azure Storage
 
+### Concepts de Stockage Azure
+
+**Qu'est-ce qu'Azure Storage ?**
+Azure Storage est le service de stockage cloud de Microsoft qui offre une solution de stockage hautement disponible, évolutive, durable et sécurisée pour les données.
+
+**Types de Stockage**
+- **Blob Storage** : Stockage d'objets pour fichiers non structurés
+- **File Storage** : Partages de fichiers SMB pour applications
+- **Queue Storage** : Stockage de messages pour communication asynchrone
+- **Table Storage** : Base de données NoSQL pour données structurées
+- **Disk Storage** : Disques managés pour machines virtuelles
+
+**Niveaux de Performance**
+- **Standard** : Stockage HDD pour charges de travail générales
+- **Premium** : Stockage SSD pour charges de travail intensives
+
+**Redondance et Disponibilité**
+- **LRS (Locally Redundant Storage)** : 3 copies dans un datacenter
+- **ZRS (Zone-Redundant Storage)** : 3 copies dans 3 zones de disponibilité
+- **GRS (Geo-Redundant Storage)** : 6 copies dans 2 régions
+- **RA-GRS (Read-Access Geo-Redundant Storage)** : GRS + accès en lecture
+
 ### Storage Account Management
+
+#### Concepts des Comptes de Stockage
+
+**Qu'est-ce qu'un Compte de Stockage ?**
+Un compte de stockage Azure contient tous vos objets de données Azure Storage : blobs, fichiers, queues, tables et disques.
+
+**Types de Comptes**
+- **General Purpose v2** : Recommandé pour la plupart des scénarios
+- **General Purpose v1** : Hérité, à éviter pour les nouveaux déploiements
+- **Blob Storage** : Spécialisé pour le stockage d'objets uniquement
+- **Premium Storage** : Pour les charges de travail intensives
+
+**Sécurité**
+- **Chiffrement au repos** : AES-256 automatique
+- **Chiffrement en transit** : HTTPS obligatoire
+- **Clés d'accès** : Authentification par clé
+- **SAS (Shared Access Signatures)** : Accès temporaire et sécurisé
 
 #### Storage Account Commands
 
@@ -325,6 +447,31 @@ New-AzStorageAccountKey -ResourceGroupName "myResourceGroup" -Name "mystorageacc
 ```
 
 ### Blob Storage
+
+#### Concepts Blob Storage
+
+**Qu'est-ce que Blob Storage ?**
+Azure Blob Storage est un service de stockage d'objets optimisé pour stocker de grandes quantités de données non structurées, comme des images, vidéos, documents, sauvegardes, etc.
+
+**Types de Blobs**
+- **Block Blobs** : Pour les fichiers volumineux (max 190.7 TB)
+- **Page Blobs** : Pour les disques de VM et bases de données (max 8 TB)
+- **Append Blobs** : Pour les opérations d'ajout uniquement
+
+**Niveaux d'Accès (Access Tiers)**
+- **Hot** : Accès fréquent, coût de stockage plus élevé
+- **Cool** : Accès moins fréquent, coût de stockage réduit
+- **Archive** : Accès rare, coût minimal, latence élevée
+
+**Conteneurs et Organisation**
+- **Conteneurs** : Organisation logique des blobs
+- **Nommage** : Règles de nommage spécifiques
+- **Métadonnées** : Informations personnalisées sur les blobs
+
+**Sécurité et Accès**
+- **Authentification** : Clés de compte ou SAS
+- **CORS** : Cross-Origin Resource Sharing
+- **Lifecycle Management** : Règles automatiques de transition
 
 **Azure CLI:**
 ```bash
@@ -382,6 +529,32 @@ Set-AzStorageBlobContent -File "localfile.txt" -Container "mycontainer" -Blob "m
 
 ### Azure Files
 
+#### Concepts Azure Files
+
+**Qu'est-ce qu'Azure Files ?**
+Azure Files offre des partages de fichiers entièrement managés dans le cloud, accessibles via le protocole SMB (Server Message Block) standard de l'industrie.
+
+**Cas d'Usage**
+- **Migration d'applications** : Applications existantes utilisant des partages de fichiers
+- **Partage de données** : Partage de fichiers entre plusieurs VMs
+- **Sauvegarde et récupération** : Stockage de sauvegardes
+- **Développement et test** : Environnements de développement
+
+**Types de Partages**
+- **Standard** : Stockage HDD pour charges de travail générales
+- **Premium** : Stockage SSD pour charges de travail intensives
+
+**Connexion et Accès**
+- **SMB** : Protocole standard pour Windows
+- **NFS** : Protocole pour Linux (Premium uniquement)
+- **REST API** : Accès programmatique
+- **Azure File Sync** : Synchronisation avec serveurs locaux
+
+**Sécurité**
+- **Authentification** : Azure AD ou clés de stockage
+- **Chiffrement** : Au repos et en transit
+- **RBAC** : Contrôle d'accès granulaire
+
 **Azure CLI:**
 ```bash
 # Create file share
@@ -434,7 +607,51 @@ New-AzStorageDirectory -ShareName "myfileshare" -Path "mydirectory" -Context $ct
 
 ## 🖥️ 3. Azure Compute Resources
 
+### Concepts de Compute Azure
+
+**Qu'est-ce que Compute Azure ?**
+Azure Compute est un ensemble de services cloud qui fournit des ressources de calcul à la demande pour héberger, exécuter et gérer des applications et des charges de travail.
+
+**Services Compute Principaux**
+- **Virtual Machines** : Machines virtuelles IaaS
+- **App Service** : Plateforme PaaS pour applications web
+- **Container Instances** : Conteneurs sans serveur
+- **Azure Functions** : Computing serverless
+- **Azure Kubernetes Service** : Orchestration de conteneurs
+
+**Avantages du Cloud Computing**
+- **Évolutivité** : Montée en charge automatique
+- **Flexibilité** : Ressources à la demande
+- **Coût** : Paiement à l'usage
+- **Disponibilité** : Haute disponibilité intégrée
+
 ### Virtual Machines
+
+#### Concepts des Machines Virtuelles
+
+**Qu'est-ce qu'une VM Azure ?**
+Une machine virtuelle Azure est un service d'infrastructure as a service (IaaS) qui vous permet de créer et utiliser des machines virtuelles dans le cloud.
+
+**Types de VMs**
+- **General Purpose** : Équilibre CPU/mémoire (B, Dsv3, Dv3)
+- **Memory Optimized** : Mémoire élevée (Esv3, Ev3, M)
+- **Compute Optimized** : CPU élevé (Fsv2, F)
+- **GPU** : Calcul intensif (NC, ND, NV)
+- **High Performance Compute** : Calcul haute performance (H)
+
+**Composants d'une VM**
+- **OS Disk** : Disque système d'exploitation
+- **Data Disks** : Disques de données
+- **Network Interface** : Interface réseau
+- **Public IP** : Adresse IP publique (optionnelle)
+- **NSG** : Groupe de sécurité réseau
+
+**Gestion du Cycle de Vie**
+- **Création** : Déploiement initial
+- **Démarrage/Arrêt** : Contrôle de l'état
+- **Redimensionnement** : Changement de taille
+- **Sauvegarde** : Protection des données
+- **Suppression** : Nettoyage des ressources
 
 #### VM Management Commands
 
@@ -518,6 +735,34 @@ Get-AzVM -ResourceGroupName "myResourceGroup" -Name "myVM" -Status
 
 ### VM Disks
 
+#### Concepts des Disques Managés
+
+**Qu'est-ce qu'un Disque Managé Azure ?**
+Les disques managés Azure sont des disques durs virtuels (VHD) stockés comme objets de page dans Azure Storage, gérés par Azure pour simplifier la gestion des disques de VM.
+
+**Types de Disques**
+- **OS Disk** : Disque système d'exploitation (max 4 TB)
+- **Data Disk** : Disque de données (max 32 TB)
+- **Temporary Disk** : Disque temporaire (non persistant)
+
+**Types de Performance**
+- **Standard HDD** : Stockage économique pour charges de travail générales
+- **Standard SSD** : Performance intermédiaire avec latence réduite
+- **Premium SSD** : Haute performance pour charges de travail intensives
+- **Ultra Disk** : Performance maximale pour charges critiques
+
+**Tailles et Limites**
+- **Taille minimale** : 4 GB
+- **Taille maximale** : 32 TB (Premium SSD)
+- **IOPS** : Dépend du type et de la taille
+- **Throughput** : Dépend du type et de la taille
+
+**Gestion des Disques**
+- **Attachement/Détachement** : Dynamique sans arrêt de VM
+- **Redimensionnement** : Augmentation possible, réduction limitée
+- **Snapshots** : Sauvegardes ponctuelles
+- **Encryption** : Chiffrement automatique au repos
+
 **Azure CLI:**
 ```bash
 # Create managed disk
@@ -569,6 +814,41 @@ New-AzSnapshot -ResourceGroupName "myResourceGroup" -SnapshotName "mySnapshot" -
 ```
 
 ### Azure App Service
+
+#### Concepts Azure App Service
+
+**Qu'est-ce qu'Azure App Service ?**
+Azure App Service est une plateforme PaaS (Platform as a Service) qui vous permet de créer et déployer rapidement des applications web, des API REST et des applications mobiles sans gérer l'infrastructure sous-jacente.
+
+**Types d'Applications**
+- **Web Apps** : Applications web et sites web
+- **API Apps** : APIs REST et microservices
+- **Mobile Apps** : Applications mobiles backend
+- **Function Apps** : Serverless computing
+- **Static Web Apps** : Sites statiques avec API
+
+**Plans de Service**
+- **Free** : Développement et test (limitations)
+- **Basic** : Applications de production simples
+- **Standard** : Applications de production avec auto-scaling
+- **Premium** : Applications critiques avec fonctionnalités avancées
+- **Isolated** : Environnements isolés pour conformité
+
+**Fonctionnalités Avancées**
+- **Auto-scaling** : Mise à l'échelle automatique
+- **Deployment Slots** : Environnements de staging
+- **Custom Domains** : Domaines personnalisés
+- **SSL/TLS** : Certificats SSL
+- **Authentication** : Intégration Azure AD
+- **Backup** : Sauvegardes automatiques
+
+**Runtimes Supportés**
+- **.NET** : .NET Core, .NET Framework
+- **Java** : Java 8, 11, 17
+- **Node.js** : Versions LTS
+- **Python** : Python 3.x
+- **PHP** : PHP 7.x, 8.x
+- **Ruby** : Ruby 2.x
 
 **Azure CLI:**
 ```bash
@@ -647,6 +927,40 @@ Switch-AzWebAppSlot -ResourceGroupName "myResourceGroup" -Name "myWebApp" -Sourc
 
 ### Container Instances
 
+#### Concepts Azure Container Instances
+
+**Qu'est-ce qu'Azure Container Instances (ACI) ?**
+Azure Container Instances est un service serverless qui vous permet de déployer des conteneurs dans Azure sans gérer de serveurs virtuels ou d'orchestrateur.
+
+**Avantages d'ACI**
+- **Serverless** : Pas de gestion d'infrastructure
+- **Rapidité** : Déploiement en secondes
+- **Coût** : Paiement uniquement pendant l'exécution
+- **Simplicité** : Interface simple pour conteneurs simples
+
+**Cas d'Usage**
+- **Traitement par lots** : Jobs de traitement de données
+- **Microservices** : Services simples et indépendants
+- **DevOps** : Pipelines CI/CD
+- **Test et développement** : Environnements temporaires
+- **Tâches événementielles** : Traitement d'événements
+
+**Types de Conteneurs**
+- **Linux** : Conteneurs Linux
+- **Windows** : Conteneurs Windows
+- **Multi-container** : Groupes de conteneurs
+
+**Ressources et Limites**
+- **CPU** : 1-4 vCPUs
+- **Mémoire** : 1-16 GB
+- **Stockage** : Volumes persistants
+- **Réseau** : IP publique ou privée
+
+**Sécurité**
+- **Isolation** : Conteneurs isolés
+- **Secrets** : Gestion des secrets
+- **Identités managées** : Authentification Azure AD
+
 **Azure CLI:**
 ```bash
 # Create container instance
@@ -696,7 +1010,51 @@ Remove-AzContainerGroup -ResourceGroupName "myResourceGroup" -Name "mycontainer"
 
 ## 🌐 4. Virtual Networking
 
+### Concepts de Réseau Azure
+
+**Qu'est-ce qu'Azure Virtual Network ?**
+Azure Virtual Network (VNet) est le service de mise en réseau fondamental d'Azure qui permet aux ressources Azure de communiquer entre elles, avec Internet et avec les réseaux locaux.
+
+**Composants du Réseau Azure**
+- **Virtual Networks** : Réseaux privés dans le cloud
+- **Subnets** : Segments de réseau pour organiser les ressources
+- **Network Security Groups** : Filtrage du trafic réseau
+- **Route Tables** : Contrôle du routage
+- **DNS** : Résolution de noms
+- **Load Balancers** : Distribution de charge
+- **Application Gateways** : Load balancing de couche 7
+
+**Avantages du Réseau Azure**
+- **Isolation** : Séparation logique des ressources
+- **Sécurité** : Contrôle granulaire du trafic
+- **Connectivité** : Liaison avec réseaux locaux
+- **Évolutivité** : Adaptation aux besoins
+- **Performance** : Optimisation du trafic
+
 ### Virtual Networks
+
+#### Concepts des Réseaux Virtuels
+
+**Qu'est-ce qu'un VNet ?**
+Un Virtual Network (VNet) est une représentation de votre propre réseau dans le cloud Azure. Il vous permet de contrôler complètement votre environnement réseau.
+
+**Architecture VNet**
+- **Address Space** : Plage d'adresses IP privées
+- **Subnets** : Segments de réseau pour organiser les ressources
+- **DNS Settings** : Configuration DNS personnalisée
+- **Peering** : Connexion entre VNets
+- **Service Endpoints** : Accès privé aux services Azure
+
+**Types d'Adressage**
+- **RFC 1918** : Adresses privées (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+- **RFC 6598** : Adresses partagées (100.64.0.0/10)
+- **Plages personnalisées** : Selon les besoins
+
+**Segmentation Réseau**
+- **Subnets** : Division logique du VNet
+- **NSG** : Contrôle d'accès par subnet
+- **Route Tables** : Routage personnalisé
+- **Service Endpoints** : Accès direct aux services Azure
 
 **Azure CLI:**
 ```bash
@@ -764,6 +1122,42 @@ Set-AzVirtualNetwork -VirtualNetwork $vnet
 
 ### Network Security Groups
 
+#### Concepts des Groupes de Sécurité Réseau
+
+**Qu'est-ce qu'un NSG ?**
+Un Network Security Group (NSG) est un service de filtrage du trafic réseau qui permet de contrôler l'accès réseau aux ressources Azure en autorisant ou refusant le trafic réseau.
+
+**Fonctionnement des NSG**
+- **Règles de sécurité** : Autoriser ou refuser le trafic
+- **Direction** : Inbound (entrant) ou Outbound (sortant)
+- **Priorité** : Ordre d'évaluation des règles (100-4096)
+- **Évaluation** : Première règle correspondante appliquée
+
+**Types de Règles**
+- **Règles de sécurité** : Contrôle du trafic par port/protocole
+- **Règles par défaut** : Règles système automatiques
+- **Règles personnalisées** : Règles définies par l'utilisateur
+
+**Composants des Règles**
+- **Nom** : Identifiant unique de la règle
+- **Priorité** : Ordre d'évaluation (plus petit = plus prioritaire)
+- **Source** : Adresse IP source ou tag de service
+- **Destination** : Adresse IP destination
+- **Port** : Port source et destination
+- **Protocole** : TCP, UDP, ICMP, ou Any
+- **Action** : Allow ou Deny
+
+**Association des NSG**
+- **Subnet** : Application à toutes les ressources du subnet
+- **NIC** : Application à une interface réseau spécifique
+- **VM** : Application via la NIC de la VM
+
+**Bonnes Pratiques**
+- **Principe du moindre privilège** : Autoriser uniquement le trafic nécessaire
+- **Règles spécifiques** : Éviter les règles trop larges
+- **Documentation** : Documenter le but de chaque règle
+- **Test** : Tester les règles avant production
+
 **Azure CLI:**
 ```bash
 # Create NSG
@@ -815,4 +1209,171 @@ Get-AzNetworkSecurityRuleConfig -NetworkSecurityGroup $nsg
 
 # Update NSG rule
 $nsg = Get-AzNetworkSecurityGroup -ResourceGroupName "myResourceGroup" -Name "myNSG"
-Set-AzNetworkSecurityRuleConfig -NetworkSecurityGroup $nsg -Name "AllowHTTP" -Priority 1001 -Access "Allow" -Protocol "TCP" -Direction "Inbound" -SourceAddressPrefix "*" -SourcePortRange
+Set-AzNetworkSecurityRuleConfig -NetworkSecurityGroup $nsg -Name "AllowHTTP" -Priority 1001 -Access "Allow" -Protocol "TCP" -Direction "Inbound" -SourceAddressPrefix "*" -SourcePortRange "*" -DestinationAddressPrefix "*" -DestinationPortRange "80"
+Set-AzNetworkSecurityGroup -NetworkSecurityGroup $nsg
+
+---
+
+## 📊 5. Monitor and Back Up Azure Resources
+
+### Concepts de Surveillance Azure
+
+**Qu'est-ce qu'Azure Monitor ?**
+Azure Monitor est une plateforme complète de surveillance qui collecte, analyse et agit sur les données de télémétrie de vos applications et ressources Azure.
+
+**Composants d'Azure Monitor**
+- **Metrics** : Données numériques sur les performances
+- **Logs** : Données textuelles détaillées
+- **Alerts** : Notifications basées sur des conditions
+- **Dashboards** : Visualisations personnalisées
+- **Workbooks** : Rapports interactifs
+- **Application Insights** : Surveillance des applications
+
+**Types de Surveillance**
+- **Infrastructure** : Surveillance des ressources Azure
+- **Application** : Surveillance du code d'application
+- **Network** : Surveillance du trafic réseau
+- **Security** : Surveillance de la sécurité
+
+### Azure Monitor Commands
+
+**Azure CLI:**
+```bash
+# List metrics
+az monitor metrics list --resource "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM" --metric "Percentage CPU"
+
+# Get activity logs
+az monitor activity-log list --start-time "2024-01-01T00:00:00Z" --end-time "2024-01-02T00:00:00Z"
+
+# Create alert rule
+az monitor metrics alert create --name "HighCPUAlert" --resource-group "myResourceGroup" --scopes "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM" --condition "avg Percentage CPU > 80" --description "Alert when CPU usage is high"
+
+# List alert rules
+az monitor metrics alert list --resource-group "myResourceGroup"
+
+# Get diagnostic settings
+az monitor diagnostic-settings list --resource "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM"
+```
+
+**PowerShell:**
+```powershell
+# Get metrics
+Get-AzMetric -ResourceId "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM" -MetricName "Percentage CPU" -TimeGrain "PT1H"
+
+# Get activity logs
+Get-AzLog -ResourceGroupName "myResourceGroup" -StartTime (Get-Date).AddDays(-1) -EndTime (Get-Date)
+
+# Create alert rule
+Add-AzMetricAlertRule -Name "HighCPUAlert" -Location "East US" -ResourceGroup "myResourceGroup" -TargetResourceId "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM" -MetricName "Percentage CPU" -Operator "GreaterThan" -Threshold 80
+
+# Get diagnostic settings
+Get-AzDiagnosticSetting -ResourceId "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM"
+```
+
+### Concepts de Sauvegarde Azure
+
+**Qu'est-ce qu'Azure Backup ?**
+Azure Backup est un service de sauvegarde cloud qui protège vos données dans Azure et sur site avec une solution de sauvegarde simple, sécurisée et économique.
+
+**Types de Sauvegarde**
+- **VM Backup** : Sauvegarde complète des machines virtuelles
+- **File/Folder Backup** : Sauvegarde de fichiers spécifiques
+- **SQL Backup** : Sauvegarde de bases de données SQL
+- **SAP HANA Backup** : Sauvegarde de bases SAP HANA
+- **Azure Files Backup** : Sauvegarde de partages de fichiers
+
+**Stratégies de Sauvegarde**
+- **Rétention** : Durée de conservation des sauvegardes
+- **Fréquence** : Fréquence des sauvegardes
+- **Type** : Complète, incrémentielle, différentielle
+- **Compression** : Réduction de l'espace de stockage
+
+**Récupération**
+- **Point de récupération** : Moment précis de restauration
+- **Récupération complète** : Restauration de toute la VM
+- **Récupération de fichiers** : Restauration de fichiers spécifiques
+- **Récupération croisée** : Restauration dans une autre région
+
+### Azure Backup Commands
+
+**Azure CLI:**
+```bash
+# Create recovery services vault
+az backup vault create --name "myVault" --resource-group "myResourceGroup" --location "eastus"
+
+# List recovery services vaults
+az backup vault list --output table
+
+# Enable backup for VM
+az backup protection enable-for-vm --resource-group "myResourceGroup" --vault-name "myVault" --vm "myVM" --policy-name "DefaultPolicy"
+
+# List backup items
+az backup item list --resource-group "myResourceGroup" --vault-name "myVault" --output table
+
+# Create backup policy
+az backup protection set-policy --resource-group "myResourceGroup" --vault-name "myVault" --policy-name "MyPolicy" --backup-management-type "AzureIaasVM" --workload-type "VM" --schedule-policy "schedule.json" --retention-policy "retention.json"
+
+# Trigger backup
+az backup protection backup-now --resource-group "myResourceGroup" --vault-name "myVault" --item-name "myVM"
+
+# List recovery points
+az backup recoverypoint list --resource-group "myResourceGroup" --vault-name "myVault" --item-name "myVM" --output table
+
+# Restore VM
+az backup restore restore-disks --resource-group "myResourceGroup" --vault-name "myVault" --item-name "myVM" --rp-name "recovery-point-name" --storage-account "mystorageaccount"
+```
+
+**PowerShell:**
+```powershell
+# Create recovery services vault
+New-AzRecoveryServicesVault -Name "myVault" -ResourceGroupName "myResourceGroup" -Location "East US"
+
+# List recovery services vaults
+Get-AzRecoveryServicesVault
+
+# Enable backup for VM
+$vault = Get-AzRecoveryServicesVault -Name "myVault"
+$policy = Get-AzRecoveryServicesBackupProtectionPolicy -VaultId $vault.ID -Name "DefaultPolicy"
+Enable-AzRecoveryServicesBackupProtection -Item $vm -Policy $policy -VaultId $vault.ID
+
+# List backup items
+Get-AzRecoveryServicesBackupItem -VaultId $vault.ID -BackupManagementType "AzureVM"
+
+# Create backup policy
+$schedule = New-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType "AzureVM" -ScheduleType "Daily" -RetentionDuration 30
+$retention = New-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType "AzureVM" -RetentionType "Daily" -RetentionCount 30
+New-AzRecoveryServicesBackupProtectionPolicy -VaultId $vault.ID -Name "MyPolicy" -WorkloadType "AzureVM" -SchedulePolicy $schedule -RetentionPolicy $retention
+
+# Trigger backup
+Backup-AzRecoveryServicesBackupItem -Item $item -VaultId $vault.ID
+
+# List recovery points
+Get-AzRecoveryServicesBackupRecoveryPoint -Item $item -VaultId $vault.ID
+
+# Restore VM
+Restore-AzRecoveryServicesBackupItem -RecoveryPoint $rp -StorageAccountName "mystorageaccount" -StorageAccountResourceGroupName "myResourceGroup" -VaultId $vault.ID
+```
+
+---
+
+## 🎯 Conseils pour l'Examen AZ-104
+
+### Stratégie de Révision
+1. **Comprendre les concepts** : Ne pas seulement mémoriser les commandes
+2. **Pratiquer** : Utiliser Azure Portal et CLI/PowerShell
+3. **Scénarios** : Étudier les cas d'usage réels
+4. **Limites** : Connaître les limites des services
+5. **Sécurité** : Focus sur les bonnes pratiques de sécurité
+
+### Points Clés par Domaine
+- **Identités** : RBAC, Azure AD, MFA, Conditional Access
+- **Stockage** : Types de stockage, redondance, sécurité
+- **Compute** : VMs, App Service, conteneurs, scaling
+- **Réseau** : VNets, NSGs, load balancing, connectivité
+- **Surveillance** : Azure Monitor, logs, alertes, sauvegarde
+
+### Ressources Recommandées
+- Documentation officielle Microsoft
+- Labs pratiques Azure
+- Examens blancs
+- Communauté Azure
