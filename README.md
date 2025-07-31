@@ -119,6 +119,38 @@ az --help
 - **Exemples** : Les deux fournissent des exemples pratiques
 - **Paramètres** : Vérifiez toujours les paramètres requis vs optionnels
 
+**Découverte des Commandes :**
+```powershell
+# PowerShell - Lister toutes les commandes Az
+Get-Command -Module Az
+
+# PowerShell - Rechercher des commandes spécifiques
+Get-Command *ADUser*
+Get-Command *Storage*
+Get-Command *VM*
+Get-Command *Network*
+Get-Command *Monitor*
+```
+
+```bash
+# Azure CLI - Lister tous les groupes de commandes
+az --help
+
+# Azure CLI - Explorer les commandes disponibles
+az ad --help
+az storage --help
+az vm --help
+az network --help
+az monitor --help
+
+# Azure CLI - Rechercher des commandes
+az find "user"
+az find "storage"
+az find "vm"
+az find "network"
+az find "monitor"
+```
+
 #### Concepts Fondamentaux
 
 **Qu'est-ce qu'Azure AD ?**
@@ -265,6 +297,21 @@ az role assignment create --help
 az find "role"
 ```
 
+**Découverte des Commandes RBAC :**
+```powershell
+# PowerShell - Commandes RBAC disponibles
+Get-Command *Role*
+Get-Command *RoleDefinition*
+Get-Command *RoleAssignment*
+```
+
+```bash
+# Azure CLI - Explorer les commandes RBAC
+az role --help
+az role definition --help
+az role assignment --help
+```
+
 #### Concepts RBAC
 
 **Qu'est-ce que RBAC ?**
@@ -342,6 +389,26 @@ Remove-AzRoleAssignment -SignInName "user@domain.com" -RoleDefinitionName "Virtu
 ```
 
 ### Azure Policy
+
+#### Découverte des Commandes Policy
+
+**PowerShell - Commandes Policy disponibles :**
+```powershell
+# PowerShell - Commandes Policy disponibles
+Get-Command *Policy*
+Get-Command *PolicyDefinition*
+Get-Command *PolicyAssignment*
+Get-Command *PolicyState*
+```
+
+**Azure CLI - Explorer les commandes Policy :**
+```bash
+# Azure CLI - Explorer les commandes Policy
+az policy --help
+az policy definition --help
+az policy assignment --help
+az policy state --help
+```
 
 #### Concepts Azure Policy
 
@@ -541,6 +608,25 @@ az storage account create --help
 
 # Rechercher des commandes de stockage
 az find "storage"
+```
+
+**Découverte des Commandes Storage :**
+```powershell
+# PowerShell - Commandes Storage disponibles
+Get-Command *Storage*
+Get-Command *StorageAccount*
+Get-Command *StorageBlob*
+Get-Command *StorageShare*
+Get-Command *StorageContainer*
+```
+
+```bash
+# Azure CLI - Explorer les commandes Storage
+az storage --help
+az storage account --help
+az storage blob --help
+az storage share --help
+az storage container --help
 ```
 
 #### Concepts des Comptes de Stockage
@@ -829,6 +915,25 @@ az vm disk --help
 az find "vm"
 ```
 
+**Découverte des Commandes VMs :**
+```powershell
+# PowerShell - Commandes VM disponibles
+Get-Command *VM*
+Get-Command *VirtualMachine*
+Get-Command *VMDisk*
+Get-Command *VMImage*
+Get-Command *VMSize*
+```
+
+```bash
+# Azure CLI - Explorer les commandes VM
+az vm --help
+az vm disk --help
+az vm image --help
+az vm size --help
+az vm extension --help
+```
+
 #### Concepts des Machines Virtuelles
 
 **Qu'est-ce qu'une VM Azure ?**
@@ -1017,6 +1122,26 @@ New-AzSnapshot -ResourceGroupName "myResourceGroup" -SnapshotName "mySnapshot" -
 
 ### Azure App Service
 
+#### Découverte des Commandes App Service
+
+**PowerShell - Commandes App Service disponibles :**
+```powershell
+# PowerShell - Commandes App Service disponibles
+Get-Command *WebApp*
+Get-Command *AppService*
+Get-Command *AppServicePlan*
+Get-Command *WebAppSlot*
+```
+
+**Azure CLI - Explorer les commandes App Service :**
+```bash
+# Azure CLI - Explorer les commandes App Service
+az webapp --help
+az appservice --help
+az appservice plan --help
+az webapp deployment --help
+```
+
 #### Concepts Azure App Service
 
 **Qu'est-ce qu'Azure App Service ?**
@@ -1128,6 +1253,25 @@ Switch-AzWebAppSlot -ResourceGroupName "myResourceGroup" -Name "myWebApp" -Sourc
 ```
 
 ### Container Instances
+
+#### Découverte des Commandes Container
+
+**PowerShell - Commandes Container disponibles :**
+```powershell
+# PowerShell - Commandes Container disponibles
+Get-Command *Container*
+Get-Command *ContainerGroup*
+Get-Command *ContainerInstance*
+```
+
+**Azure CLI - Explorer les commandes Container :**
+```bash
+# Azure CLI - Explorer les commandes Container
+az container --help
+az container group --help
+az container instance --help
+az acr --help  # Azure Container Registry
+```
 
 #### Concepts Azure Container Instances
 
@@ -1271,6 +1415,25 @@ az network vnet create --help
 
 # Rechercher des commandes réseau
 az find "network"
+```
+
+**Découverte des Commandes Réseau :**
+```powershell
+# PowerShell - Commandes Network disponibles
+Get-Command *Network*
+Get-Command *VirtualNetwork*
+Get-Command *NetworkSecurityGroup*
+Get-Command *Subnet*
+Get-Command *NetworkInterface*
+```
+
+```bash
+# Azure CLI - Explorer les commandes Network
+az network --help
+az network vnet --help
+az network nsg --help
+az network nic --help
+az network lb --help
 ```
 
 #### Concepts des Réseaux Virtuels
@@ -1496,6 +1659,25 @@ az monitor activity-log --help
 az find "monitor"
 ```
 
+**Découverte des Commandes Monitor :**
+```powershell
+# PowerShell - Commandes Monitor disponibles
+Get-Command *Monitor*
+Get-Command *Metric*
+Get-Command *Alert*
+Get-Command *Log*
+Get-Command *Diagnostic*
+```
+
+```bash
+# Azure CLI - Explorer les commandes Monitor
+az monitor --help
+az monitor metrics --help
+az monitor alert --help
+az monitor log --help
+az monitor diagnostic --help
+```
+
 **Qu'est-ce qu'Azure Monitor ?**
 Azure Monitor est une plateforme complète de surveillance qui collecte, analyse et agit sur les données de télémétrie de vos applications et ressources Azure.
 
@@ -1574,6 +1756,26 @@ Azure Backup est un service de sauvegarde cloud qui protège vos données dans A
 
 ### Azure Backup Commands
 
+#### Découverte des Commandes Backup
+
+**PowerShell - Commandes Backup disponibles :**
+```powershell
+# PowerShell - Commandes Backup disponibles
+Get-Command *Backup*
+Get-Command *Recovery*
+Get-Command *Vault*
+Get-Command *RecoveryServices*
+```
+
+**Azure CLI - Explorer les commandes Backup :**
+```bash
+# Azure CLI - Explorer les commandes Backup
+az backup --help
+az backup vault --help
+az backup protection --help
+az backup recoverypoint --help
+```
+
 **Azure CLI:**
 ```bash
 # Create recovery services vault
@@ -1635,6 +1837,73 @@ Restore-AzRecoveryServicesBackupItem -RecoveryPoint $rp -StorageAccountName "mys
 ---
 
 ## 🎯 Conseils pour l'Examen AZ-104
+
+### Découverte Complète des Commandes
+
+**PowerShell - Toutes les commandes Az par domaine :**
+```powershell
+# Identités et Gouvernance
+Get-Command *ADUser*        # Utilisateurs Azure AD
+Get-Command *ADGroup*        # Groupes Azure AD
+Get-Command *Role*           # RBAC
+Get-Command *Policy*         # Azure Policy
+
+# Stockage
+Get-Command *Storage*        # Stockage Azure
+Get-Command *StorageAccount* # Comptes de stockage
+Get-Command *StorageBlob*    # Blob Storage
+Get-Command *StorageShare*   # File Storage
+
+# Compute
+Get-Command *VM*             # Machines virtuelles
+Get-Command *WebApp*         # App Service
+Get-Command *Container*      # Container Instances
+Get-Command *AppService*     # App Service Plans
+
+# Réseau
+Get-Command *Network*        # Réseau Azure
+Get-Command *VirtualNetwork* # VNets
+Get-Command *NetworkSecurityGroup* # NSGs
+Get-Command *Subnet*         # Sous-réseaux
+
+# Surveillance
+Get-Command *Monitor*        # Azure Monitor
+Get-Command *Metric*         # Métriques
+Get-Command *Alert*          # Alertes
+Get-Command *Backup*         # Sauvegarde
+```
+
+**Azure CLI - Tous les groupes de commandes :**
+```bash
+# Identités et Gouvernance
+az ad --help                 # Azure Active Directory
+az role --help               # RBAC
+az policy --help             # Azure Policy
+
+# Stockage
+az storage --help            # Stockage Azure
+az storage account --help    # Comptes de stockage
+az storage blob --help       # Blob Storage
+az storage share --help      # File Storage
+
+# Compute
+az vm --help                 # Machines virtuelles
+az webapp --help             # App Service
+az container --help          # Container Instances
+az appservice --help         # App Service Plans
+
+# Réseau
+az network --help            # Réseau Azure
+az network vnet --help       # VNets
+az network nsg --help        # NSGs
+az network subnet --help     # Sous-réseaux
+
+# Surveillance
+az monitor --help            # Azure Monitor
+az backup --help             # Azure Backup
+az metrics --help            # Métriques
+az alert --help              # Alertes
+```
 
 ### Stratégie de Révision
 1. **Comprendre les concepts** : Ne pas seulement mémoriser les commandes
