@@ -1,0 +1,31 @@
+# Fichiers temporaires
+*.tmp
+*.temp
+*.log
+
+# Fichiers de build
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers d'environnement
+.env
+.env.local
+.env.production
+
+# Fichiers de dépendances
+node_modules/
+vendor/
+
+# Fichiers de backup
+*.bak
+*.backup
+
+# Fichiers de cache
+.cache/
+*.cache 

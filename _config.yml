@@ -1,0 +1,36 @@
+# Configuration GitHub Pages
+title: AZ-104 Guide - Microsoft Azure Administrator
+description: Guide complet pour la certification AZ-104 Microsoft Azure Administrator
+author: Lucas Le Pouliquen
+email: lucaslepouliquen@outlook.fr
+
+# Configuration Jekyll
+theme: jekyll-theme-cayman
+plugins:
+  - jekyll-relative-links
+  - jekyll-seo-tag
+
+# Configuration du site
+url: "https://lucaslepouliquen.github.io/az-104"
+baseurl: "/az-104"
+
+# Configuration de la navigation
+show_downloads: false
+show_header: true
+
+# Configuration des métadonnées
+lang: fr
+locale: fr_FR
+
+# Configuration des liens
+relative_links:
+  enabled: true
+  collections: true
+
+# Configuration SEO
+seo:
+  title: AZ-104 Guide - Microsoft Azure Administrator
+  description: Guide complet pour la certification AZ-104 Microsoft Azure Administrator
+  author: Lucas Le Pouliquen
+  image: /assets/images/azure-logo.png
+  type: website 
