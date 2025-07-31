@@ -546,6 +546,443 @@ Get-AzManagementGroup
 
 ---
 
+## 🏗️ Infrastructure as Code (ARM Templates & Bicep)
+
+### Concepts d'Infrastructure as Code
+
+**Qu'est-ce que l'Infrastructure as Code (IaC) ?**
+L'Infrastructure as Code est une approche de gestion de l'infrastructure qui traite la configuration et le déploiement d'infrastructure comme du code logiciel, permettant l'automatisation, la reproductibilité et la versioning.
+
+**Avantages de l'IaC :**
+- **Reproductibilité** : Déploiements identiques et prévisibles
+- **Versioning** : Contrôle de version de l'infrastructure
+- **Automation** : Déploiements automatisés et CI/CD
+- **Consistency** : Cohérence entre environnements
+- **Documentation** : Infrastructure documentée dans le code
+- **Collaboration** : Travail d'équipe sur l'infrastructure
+
+### Azure Resource Manager (ARM) Templates
+
+#### Concepts ARM Templates
+
+**Qu'est-ce qu'un ARM Template ?**
+Un ARM Template est un fichier JSON qui définit l'infrastructure et la configuration de vos ressources Azure. Il utilise le service Azure Resource Manager pour déployer et gérer vos ressources.
+
+**Structure d'un ARM Template :**
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    // Paramètres d'entrée
+  },
+  "variables": {
+    // Variables internes
+  },
+  "resources": [
+    // Définition des ressources
+  ],
+  "outputs": {
+    // Valeurs de sortie
+  }
+}
+```
+
+**Composants ARM Template :**
+- **Parameters** : Valeurs d'entrée configurables
+- **Variables** : Valeurs calculées ou réutilisables
+- **Resources** : Définition des ressources Azure
+- **Outputs** : Valeurs retournées après déploiement
+- **Functions** : Fonctions intégrées pour la logique
+
+#### ARM Template Commands
+
+**Azure CLI:**
+```bash
+# Deploy ARM template
+az deployment group create --resource-group "myResourceGroup" --template-file "template.json" --parameters "parameters.json"
+
+# Deploy ARM template with inline parameters
+az deployment group create --resource-group "myResourceGroup" --template-file "template.json" --parameters "param1=value1" "param2=value2"
+
+# Validate ARM template
+az deployment group validate --resource-group "myResourceGroup" --template-file "template.json" --parameters "parameters.json"
+
+# Export ARM template from existing resources
+az group export --resource-group "myResourceGroup" --include-parameter-default-value
+
+# What-if deployment (preview changes)
+az deployment group what-if --resource-group "myResourceGroup" --template-file "template.json" --parameters "parameters.json"
+
+# Deploy ARM template at subscription level
+az deployment sub create --location "eastus" --template-file "template.json" --parameters "parameters.json"
+
+# Deploy ARM template at management group level
+az deployment mg create --location "eastus" --template-file "template.json" --parameters "parameters.json"
+
+# Deploy ARM template at tenant level
+az deployment tenant create --location "eastus" --template-file "template.json" --parameters "parameters.json"
+```
+
+**PowerShell:**
+```powershell
+# Deploy ARM template
+New-AzResourceGroupDeployment -ResourceGroupName "myResourceGroup" -TemplateFile "template.json" -TemplateParameterFile "parameters.json"
+
+# Deploy ARM template with inline parameters
+New-AzResourceGroupDeployment -ResourceGroupName "myResourceGroup" -TemplateFile "template.json" -param1 "value1" -param2 "value2"
+
+# Validate ARM template
+Test-AzResourceGroupDeployment -ResourceGroupName "myResourceGroup" -TemplateFile "template.json" -TemplateParameterFile "parameters.json"
+
+# Export ARM template from existing resources
+Export-AzResourceGroup -ResourceGroupName "myResourceGroup" -IncludeParameterDefaultValue
+
+# What-if deployment (preview changes)
+New-AzResourceGroupDeployment -ResourceGroupName "myResourceGroup" -TemplateFile "template.json" -WhatIf
+
+# Deploy ARM template at subscription level
+New-AzDeployment -Location "East US" -TemplateFile "template.json" -TemplateParameterFile "parameters.json"
+
+# Deploy ARM template at management group level
+New-AzManagementGroupDeployment -ManagementGroupId "myManagementGroup" -Location "East US" -TemplateFile "template.json" -TemplateParameterFile "parameters.json"
+
+# Deploy ARM template at tenant level
+New-AzTenantDeployment -Location "East US" -TemplateFile "template.json" -TemplateParameterFile "parameters.json"
+```
+
+#### Exemple ARM Template
+
+**Template de base pour un compte de stockage :**
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the storage account"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "sku": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_GRS",
+        "Standard_ZRS"
+      ],
+      "metadata": {
+        "description": "Storage account SKU"
+      }
+    }
+  },
+  "variables": {
+    "storageAccountName": "[toLower(parameters('storageAccountName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-09-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('sku')]"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2"
+      }
+    }
+  ],
+  "outputs": {
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('storageAccountName')]"
+    },
+    "storageAccountId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+    }
+  }
+}
+```
+
+**Fichier de paramètres :**
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccountName": {
+      "value": "mystorageaccount123"
+    },
+    "location": {
+      "value": "East US"
+    },
+    "sku": {
+      "value": "Standard_GRS"
+    }
+  }
+}
+```
+
+### Azure Bicep
+
+#### Concepts Azure Bicep
+
+**Qu'est-ce qu'Azure Bicep ?**
+Azure Bicep est un langage de domaine spécifique (DSL) qui simplifie l'écriture d'ARM templates. Il offre une syntaxe plus claire et plus concise que JSON, tout en générant des ARM templates valides.
+
+**Avantages de Bicep :**
+- **Syntaxe simplifiée** : Plus lisible que JSON
+- **IntelliSense** : Support complet dans VS Code
+- **Modularité** : Réutilisation de modules
+- **Validation** : Validation en temps réel
+- **Compilation** : Génération automatique d'ARM templates
+- **Versioning** : Compatible avec Git
+
+**Structure d'un fichier Bicep :**
+```bicep
+@description('Description du paramètre')
+param parameterName string = 'defaultValue'
+
+var variableName = 'computedValue'
+
+resource resourceName 'Microsoft.Provider/resourceType@apiVersion' = {
+  name: 'resourceName'
+  location: location
+  properties: {
+    // Propriétés de la ressource
+  }
+}
+
+output outputName string = resourceName.properties.outputProperty
+```
+
+#### Bicep Commands
+
+**Azure CLI:**
+```bash
+# Deploy Bicep file
+az deployment group create --resource-group "myResourceGroup" --template-file "template.bicep" --parameters "parameters.json"
+
+# Deploy Bicep file with inline parameters
+az deployment group create --resource-group "myResourceGroup" --template-file "template.bicep" --parameters "param1=value1" "param2=value2"
+
+# Validate Bicep file
+az deployment group validate --resource-group "myResourceGroup" --template-file "template.bicep" --parameters "parameters.json"
+
+# Build Bicep to ARM template
+az bicep build --file "template.bicep"
+
+# Decompile ARM template to Bicep
+az bicep decompile --file "template.json"
+
+# Install Bicep CLI
+az bicep install
+
+# Update Bicep CLI
+az bicep upgrade
+
+# Check Bicep version
+az bicep version
+
+# Lint Bicep file
+az bicep build --file "template.bicep" --stdout
+
+# Deploy Bicep at subscription level
+az deployment sub create --location "eastus" --template-file "template.bicep" --parameters "parameters.json"
+
+# Deploy Bicep at management group level
+az deployment mg create --location "eastus" --template-file "template.bicep" --parameters "parameters.json"
+```
+
+**PowerShell:**
+```powershell
+# Deploy Bicep file
+New-AzResourceGroupDeployment -ResourceGroupName "myResourceGroup" -TemplateFile "template.bicep" -TemplateParameterFile "parameters.json"
+
+# Deploy Bicep file with inline parameters
+New-AzResourceGroupDeployment -ResourceGroupName "myResourceGroup" -TemplateFile "template.bicep" -param1 "value1" -param2 "value2"
+
+# Validate Bicep file
+Test-AzResourceGroupDeployment -ResourceGroupName "myResourceGroup" -TemplateFile "template.bicep" -TemplateParameterFile "parameters.json"
+
+# Build Bicep to ARM template
+bicep build template.bicep
+
+# Decompile ARM template to Bicep
+bicep decompile template.json
+
+# Deploy Bicep at subscription level
+New-AzDeployment -Location "East US" -TemplateFile "template.bicep" -TemplateParameterFile "parameters.json"
+
+# Deploy Bicep at management group level
+New-AzManagementGroupDeployment -ManagementGroupId "myManagementGroup" -Location "East US" -TemplateFile "template.bicep" -TemplateParameterFile "parameters.json"
+```
+
+#### Exemple Bicep
+
+**Template Bicep équivalent au JSON précédent :**
+```bicep
+@description('Name of the storage account')
+param storageAccountName string
+
+@description('Location for all resources')
+param location string = resourceGroup().location
+
+@description('Storage account SKU')
+@allowed([
+  'Standard_LRS'
+  'Standard_GRS'
+  'Standard_ZRS'
+])
+param sku string = 'Standard_LRS'
+
+var storageAccountNameLower = toLower(storageAccountName)
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+  name: storageAccountNameLower
+  location: location
+  sku: {
+    name: sku
+  }
+  kind: 'StorageV2'
+  properties: {
+    supportsHttpsTrafficOnly: true
+    minimumTlsVersion: 'TLS1_2'
+  }
+}
+
+output storageAccountName string = storageAccountNameLower
+output storageAccountId string = storageAccount.id
+```
+
+#### Fonctionnalités Avancées Bicep
+
+**Modules Bicep :**
+```bicep
+// main.bicep
+param storageAccountName string
+param location string = resourceGroup().location
+
+module storageModule 'modules/storage.bicep' = {
+  name: 'storageDeployment'
+  params: {
+    storageAccountName: storageAccountName
+    location: location
+  }
+}
+
+output storageAccountId string = storageModule.outputs.storageAccountId
+```
+
+```bicep
+// modules/storage.bicep
+param storageAccountName string
+param location string
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+  name: storageAccountName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+}
+
+output storageAccountId string = storageAccount.id
+```
+
+**Conditions et Boucles :**
+```bicep
+param environment string = 'dev'
+param vmCount int = 1
+
+// Condition
+resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = if (environment == 'prod') {
+  name: 'prodstorageaccount'
+  location: resourceGroup().location
+  sku: {
+    name: 'Standard_GRS'
+  }
+  kind: 'StorageV2'
+}
+
+// Boucle
+resource vm 'Microsoft.Compute/virtualMachines@2021-11-01' = [for i in range(0, vmCount): {
+  name: 'vm-${i}'
+  location: resourceGroup().location
+  properties: {
+    // Propriétés de la VM
+  }
+}]
+```
+
+**Fonctions et Expressions :**
+```bicep
+// Utilisation de fonctions
+var uniqueString = uniqueString(resourceGroup().id)
+var concatName = concat('storage', uniqueString)
+
+// Expressions conditionnelles
+var skuName = environment == 'prod' ? 'Standard_GRS' : 'Standard_LRS'
+
+// Références entre ressources
+resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+  name: concatName
+  location: resourceGroup().location
+  sku: {
+    name: skuName
+  }
+  kind: 'StorageV2'
+}
+
+resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2021-09-01' = {
+  parent: storageAccount
+  name: 'default/mycontainer'
+}
+```
+
+### Bonnes Pratiques ARM/Bicep
+
+**Organisation et Structure :**
+- **Modularité** : Diviser les templates en modules réutilisables
+- **Paramétrage** : Utiliser des paramètres pour la flexibilité
+- **Validation** : Valider les templates avant déploiement
+- **Versioning** : Utiliser Git pour le contrôle de version
+- **Documentation** : Documenter les paramètres et modules
+
+**Sécurité :**
+- **Secrets** : Utiliser Key Vault pour les secrets
+- **RBAC** : Définir les rôles appropriés
+- **Chiffrement** : Activer le chiffrement par défaut
+- **NSG** : Configurer les groupes de sécurité réseau
+
+**Performance :**
+- **Dépendances** : Optimiser les dépendances entre ressources
+- **Parallélisation** : Utiliser dependsOn pour le parallélisme
+- **Taille** : Limiter la taille des templates
+- **Caching** : Utiliser les outputs pour éviter les recalculs
+
+**Maintenance :**
+- **Naming** : Conventions de nommage cohérentes
+- **Tags** : Utiliser des tags pour l'organisation
+- **Testing** : Tests automatisés des templates
+- **Monitoring** : Surveiller les déploiements
+
+---
+
 ## 💾 2. Azure Storage
 
 ### Concepts de Stockage Azure
@@ -565,10 +1002,70 @@ Azure Storage est le service de stockage cloud de Microsoft qui offre une soluti
 - **Premium** : Stockage SSD pour charges de travail intensives
 
 **Redondance et Disponibilité**
-- **LRS (Locally Redundant Storage)** : 3 copies dans un datacenter
-- **ZRS (Zone-Redundant Storage)** : 3 copies dans 3 zones de disponibilité
-- **GRS (Geo-Redundant Storage)** : 6 copies dans 2 régions
-- **RA-GRS (Read-Access Geo-Redundant Storage)** : GRS + accès en lecture
+
+**Types de Redondance de Stockage Azure :**
+
+1. **LRS (Locally Redundant Storage)**
+   - **Disponibilité** : 99.9% (99% pour les comptes GPv1)
+   - **Copies** : 3 copies synchrones dans un datacenter
+   - **Région** : Une seule région
+   - **Coût** : ~0.0184€/GB/mois (le moins cher)
+   - **Cas d'usage** : Développement/test, données non critiques
+
+2. **ZRS (Zone-Redundant Storage)**
+   - **Disponibilité** : 99.9%
+   - **Copies** : 3 copies synchrones dans 3 zones de disponibilité
+   - **Région** : Une seule région, plusieurs zones
+   - **Coût** : ~0.0202€/GB/mois (+10% vs LRS)
+   - **Cas d'usage** : Applications critiques nécessitant haute disponibilité
+
+3. **GRS (Geo-Redundant Storage)**
+   - **Disponibilité** : 99.9%
+   - **Copies** : 6 copies (3 dans région primaire + 3 dans région secondaire)
+   - **Région** : Deux régions (primaire + secondaire)
+   - **Coût** : ~0.0368€/GB/mois (+100% vs LRS)
+   - **Cas d'usage** : Protection contre les sinistres régionaux
+
+4. **RA-GRS (Read-Access Geo-Redundant Storage)**
+   - **Disponibilité** : 99.9%
+   - **Copies** : 6 copies (comme GRS)
+   - **Accès** : Lecture possible sur la région secondaire
+   - **Région** : Deux régions avec accès en lecture
+   - **Coût** : ~0.0368€/GB/mois (même prix que GRS)
+   - **Cas d'usage** : Applications nécessitant accès en lecture sur région secondaire
+
+5. **GZRS (Geo-Zone-Redundant Storage)**
+   - **Disponibilité** : 99.9%
+   - **Copies** : 6 copies (3 dans 3 zones de la région primaire + 3 dans région secondaire)
+   - **Région** : Deux régions avec ZRS dans la primaire
+   - **Coût** : ~0.0404€/GB/mois (+120% vs LRS)
+   - **Cas d'usage** : Applications critiques nécessitant protection maximale
+
+6. **RA-GZRS (Read-Access Geo-Zone-Redundant Storage)**
+   - **Disponibilité** : 99.9%
+   - **Copies** : 6 copies (comme GZRS)
+   - **Accès** : Lecture possible sur la région secondaire
+   - **Région** : Deux régions avec accès en lecture
+   - **Coût** : ~0.0404€/GB/mois (même prix que GZRS)
+   - **Cas d'usage** : Applications critiques avec accès en lecture sur région secondaire
+
+**Comparaison Détaillée des Coûts :**
+
+| Type | Coût relatif | Coût estimé | Facteur multiplicateur | Avantage principal |
+|------|-------------|-------------|----------------------|-------------------|
+| LRS | 1x | ~0.0184€/GB/mois | Base | Économique |
+| ZRS | 1.1x | ~0.0202€/GB/mois | +10% | Haute disponibilité |
+| GRS | 2x | ~0.0368€/GB/mois | +100% | Protection géographique |
+| RA-GRS | 2x | ~0.0368€/GB/mois | +100% | Protection + accès lecture |
+| GZRS | 2.2x | ~0.0404€/GB/mois | +120% | Protection maximale |
+| RA-GZRS | 2.2x | ~0.0404€/GB/mois | +120% | Protection max + accès lecture |
+
+**Notes sur les coûts :**
+- Les prix sont approximatifs et peuvent varier selon la région
+- Les coûts incluent le stockage et la bande passante sortante
+- Les opérations (lecture/écriture) ont des coûts supplémentaires
+- Les prix sont basés sur le stockage GPv2 Standard
+- Les réductions de volume peuvent s'appliquer pour de grandes quantités
 
 ### Storage Account Management
 
@@ -639,6 +1136,244 @@ Un compte de stockage Azure contient tous vos objets de données Azure Storage :
 - **General Purpose v1** : Hérité, à éviter pour les nouveaux déploiements
 - **Blob Storage** : Spécialisé pour le stockage d'objets uniquement
 - **Premium Storage** : Pour les charges de travail intensives
+
+#### Types Détaillés de Comptes de Stockage Azure
+
+**1. General Purpose v2 (GPv2) - Recommandé**
+
+**Caractéristiques :**
+- **Performance** : Standard (HDD) et Premium (SSD) disponibles
+- **Redondance** : Tous les types de redondance supportés
+- **Services** : Blobs, Files, Queues, Tables, Disques
+- **API** : REST API complète
+- **Coût** : Tarification à la demande optimisée
+
+**Avantages :**
+- ✅ Fonctionnalités les plus récentes
+- ✅ Tarification la plus économique
+- ✅ Support de tous les services de stockage
+- ✅ Hiérarchisation automatique des blobs
+- ✅ Accès en lecture géo-redondant (RA-GRS/RA-GZRS)
+- ✅ Azure Data Lake Storage Gen2
+
+**Cas d'usage recommandés :**
+- Nouvelles applications
+- Migrations depuis GPv1
+- Scénarios nécessitant toutes les fonctionnalités
+- Optimisation des coûts
+
+**2. General Purpose v1 (GPv1) - Hérité**
+
+**Caractéristiques :**
+- **Performance** : Standard uniquement (HDD)
+- **Redondance** : LRS et GRS uniquement
+- **Services** : Blobs, Files, Queues, Tables, Disques
+- **API** : REST API complète
+- **Coût** : Tarification classique
+
+**Limitations :**
+- ❌ Pas de support Premium (SSD)
+- ❌ Pas de ZRS, GZRS, RA-GZRS
+- ❌ Pas de hiérarchisation automatique
+- ❌ Pas d'accès en lecture géo-redondant
+- ❌ Pas d'Azure Data Lake Storage Gen2
+- ❌ Moins de fonctionnalités de sécurité
+
+**Cas d'usage (migration recommandée) :**
+- Applications existantes (migrer vers GPv2)
+- Scénarios simples sans besoins avancés
+
+**3. Blob Storage - Spécialisé**
+
+**Caractéristiques :**
+- **Performance** : Standard (HDD) et Premium (SSD)
+- **Redondance** : Tous les types supportés
+- **Services** : Blobs uniquement
+- **API** : REST API pour blobs
+- **Coût** : Tarification optimisée pour blobs
+
+**Avantages :**
+- ✅ Optimisé pour le stockage d'objets
+- ✅ Hiérarchisation automatique
+- ✅ Accès en lecture géo-redondant
+- ✅ Azure Data Lake Storage Gen2
+- ✅ Coûts réduits pour stockage blob uniquement
+
+**Cas d'usage :**
+- Applications nécessitant uniquement du stockage blob
+- Stockage de fichiers statiques (images, vidéos)
+- Sauvegarde et archivage
+- Big Data et analytics
+
+**4. Premium Storage - Performance Élevée**
+
+**Caractéristiques :**
+- **Performance** : SSD uniquement (haute performance)
+- **Redondance** : LRS uniquement
+- **Services** : Blobs, Files, Disques
+- **Latence** : < 1ms
+- **IOPS** : Jusqu'à 20,000 IOPS par disque
+
+**Avantages :**
+- ✅ Performance SSD élevée
+- ✅ Latence ultra-faible
+- ✅ IOPS élevées
+- ✅ Idéal pour VMs critiques
+- ✅ Bases de données haute performance
+
+**Cas d'usage :**
+- Machines virtuelles critiques
+- Bases de données (SQL Server, Oracle)
+- Applications nécessitant haute performance
+- Charges de travail intensives en I/O
+
+**5. Premium Block Blob Storage - Nouveau**
+
+**Caractéristiques :**
+- **Performance** : SSD uniquement
+- **Redundance** : LRS et ZRS
+- **Services** : Blobs uniquement
+- **Latence** : < 1ms
+- **Throughput** : Jusqu'à 2,500 MB/s
+
+**Avantages :**
+- ✅ Performance SSD pour blobs
+- ✅ Latence ultra-faible
+- ✅ Throughput élevé
+- ✅ Idéal pour analytics et ML
+- ✅ Streaming de données haute performance
+
+**Cas d'usage :**
+- Analytics en temps réel
+- Machine Learning
+- Streaming de données
+- Applications nécessitant haute performance pour blobs
+
+**Comparaison Détaillée des Types de Comptes :**
+
+| Type | Performance | Services | Redondance | Coût | Recommandation |
+|------|-------------|----------|------------|------|----------------|
+| GPv2 | Standard/Premium | Tous | Tous | Optimisé | ✅ Nouveau |
+| GPv1 | Standard uniquement | Tous | LRS/GRS | Classique | ❌ Hérité |
+| Blob Storage | Standard/Premium | Blobs uniquement | Tous | Optimisé | ✅ Spécialisé |
+| Premium Storage | SSD uniquement | Blobs/Files/Disques | LRS | Élevé | ✅ Performance |
+| Premium Block Blob | SSD uniquement | Blobs uniquement | LRS/ZRS | Élevé | ✅ Performance Blob |
+
+**Migration GPv1 vers GPv2 :**
+
+**Commandes de Migration :**
+```bash
+# Azure CLI - Migration GPv1 vers GPv2
+az storage account update \
+  --name "mystorageaccount" \
+  --resource-group "myResourceGroup" \
+  --set kind=StorageV2
+
+# PowerShell - Migration GPv1 vers GPv2
+Set-AzStorageAccount \
+  -ResourceGroupName "myResourceGroup" \
+  -Name "mystorageaccount" \
+  -Kind StorageV2
+```
+
+**Vérification de la Migration :**
+```bash
+# Vérifier le type de compte
+az storage account show \
+  --name "mystorageaccount" \
+  --resource-group "myResourceGroup" \
+  --query "kind"
+
+# PowerShell
+Get-AzStorageAccount \
+  -ResourceGroupName "myResourceGroup" \
+  -Name "mystorageaccount" | Select-Object Kind
+```
+
+**Avantages de la Migration :**
+- ✅ Accès aux nouvelles fonctionnalités
+- ✅ Réduction des coûts (tarification optimisée)
+- ✅ Support de tous les types de redondance
+- ✅ Hiérarchisation automatique
+- ✅ Meilleure sécurité
+
+**Commandes de Création par Type :**
+
+**GPv2 (Recommandé) :**
+```bash
+# Azure CLI
+az storage account create \
+  --name "mystorageaccount" \
+  --resource-group "myResourceGroup" \
+  --location "eastus" \
+  --sku "Standard_LRS" \
+  --kind "StorageV2"
+
+# PowerShell
+New-AzStorageAccount \
+  -ResourceGroupName "myResourceGroup" \
+  -Name "mystorageaccount" \
+  -Location "East US" \
+  -SkuName "Standard_LRS" \
+  -Kind "StorageV2"
+```
+
+**Blob Storage :**
+```bash
+# Azure CLI
+az storage account create \
+  --name "myblobstorage" \
+  --resource-group "myResourceGroup" \
+  --location "eastus" \
+  --sku "Standard_LRS" \
+  --kind "BlobStorage"
+
+# PowerShell
+New-AzStorageAccount \
+  -ResourceGroupName "myResourceGroup" \
+  -Name "myblobstorage" \
+  -Location "East US" \
+  -SkuName "Standard_LRS" \
+  -Kind "BlobStorage"
+```
+
+**Premium Storage :**
+```bash
+# Azure CLI
+az storage account create \
+  --name "mypremiumstorage" \
+  --resource-group "myResourceGroup" \
+  --location "eastus" \
+  --sku "Premium_LRS" \
+  --kind "StorageV2"
+
+# PowerShell
+New-AzStorageAccount \
+  -ResourceGroupName "myResourceGroup" \
+  -Name "mypremiumstorage" \
+  -Location "East US" \
+  -SkuName "Premium_LRS" \
+  -Kind "StorageV2"
+```
+
+**Premium Block Blob Storage :**
+```bash
+# Azure CLI
+az storage account create \
+  --name "mypremiumblob" \
+  --resource-group "myResourceGroup" \
+  --location "eastus" \
+  --sku "Premium_LRS" \
+  --kind "BlockBlobStorage"
+
+# PowerShell
+New-AzStorageAccount \
+  -ResourceGroupName "myResourceGroup" \
+  -Name "mypremiumblob" \
+  -Location "East US" \
+  -SkuName "Premium_LRS" \
+  -Kind "BlockBlobStorage"
+```
 
 **Sécurité**
 - **Chiffrement au repos** : AES-256 automatique
