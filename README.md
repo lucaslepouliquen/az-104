@@ -68,6 +68,57 @@ Get-AzRoleAssignment -SignInName (Get-AzContext).Account.Id
 Get-AzADUser -First 1
 ```
 
+#### Aide et Documentation des Commandes
+
+**PowerShell - Get-Help :**
+```powershell
+# Aide générale sur une commande
+Get-Help Get-AzADUser
+
+# Aide détaillée avec exemples
+Get-Help Get-AzADUser -Detailed
+
+# Aide complète avec tous les paramètres
+Get-Help Get-AzADUser -Full
+
+# Aide avec exemples uniquement
+Get-Help Get-AzADUser -Examples
+
+# Rechercher des commandes contenant un mot
+Get-Help *ADUser*
+
+# Aide sur un paramètre spécifique
+Get-Help Get-AzADUser -Parameter UserPrincipalName
+```
+
+**Azure CLI - --help :**
+```bash
+# Aide générale sur une commande
+az ad user --help
+
+# Aide sur une sous-commande
+az ad user list --help
+
+# Aide détaillée avec exemples
+az ad user create --help
+
+# Rechercher des commandes
+az find "user"
+
+# Aide sur un groupe de commandes
+az ad --help
+
+# Aide sur les paramètres globaux
+az --help
+```
+
+**Conseils d'Utilisation :**
+- **PowerShell** : `Get-Help` est plus verbeux et structuré
+- **Azure CLI** : `--help` est plus concis et orienté action
+- **Recherche** : Utilisez `Get-Help *mot*` ou `az find "mot"`
+- **Exemples** : Les deux fournissent des exemples pratiques
+- **Paramètres** : Vérifiez toujours les paramètres requis vs optionnels
+
 #### Concepts Fondamentaux
 
 **Qu'est-ce qu'Azure AD ?**
@@ -120,7 +171,7 @@ az ad user update --id "john.doe@yourdomain.com" --password "NewPassword123!" --
 
 **PowerShell:**
 ```powershell
-# Connect to Azure AD (modern approach)
+# Connect to Azure AD
 Connect-AzAccount
 
 # Create a user
@@ -181,6 +232,38 @@ Get-AzADGroupMember -GroupObjectId "group-object-id"
 ```
 
 ### Role-Based Access Control (RBAC)
+
+#### Aide RBAC
+
+**PowerShell - Aide RBAC :**
+```powershell
+# Aide sur les commandes RBAC
+Get-Help *Role*
+
+# Aide spécifique sur les rôles
+Get-Help Get-AzRoleDefinition -Detailed
+
+# Aide sur les assignations
+Get-Help New-AzRoleAssignment -Examples
+
+# Rechercher des commandes RBAC
+Get-Help *RoleAssignment*
+```
+
+**Azure CLI - Aide RBAC :**
+```bash
+# Aide sur les rôles
+az role definition --help
+
+# Aide sur les assignations
+az role assignment --help
+
+# Aide sur une sous-commande spécifique
+az role assignment create --help
+
+# Rechercher des commandes RBAC
+az find "role"
+```
 
 #### Concepts RBAC
 
@@ -421,6 +504,44 @@ Azure Storage est le service de stockage cloud de Microsoft qui offre une soluti
 - **RA-GRS (Read-Access Geo-Redundant Storage)** : GRS + accès en lecture
 
 ### Storage Account Management
+
+#### Aide Storage
+
+**PowerShell - Aide Storage :**
+```powershell
+# Aide sur les commandes de stockage
+Get-Help *Storage*
+
+# Aide spécifique sur les comptes de stockage
+Get-Help New-AzStorageAccount -Detailed
+
+# Aide sur les blobs
+Get-Help *StorageBlob* -Examples
+
+# Aide sur les partages de fichiers
+Get-Help *StorageShare* -Full
+
+# Rechercher des commandes de stockage
+Get-Help *StorageAccount*
+```
+
+**Azure CLI - Aide Storage :**
+```bash
+# Aide sur les comptes de stockage
+az storage account --help
+
+# Aide sur les blobs
+az storage blob --help
+
+# Aide sur les partages de fichiers
+az storage share --help
+
+# Aide sur une sous-commande spécifique
+az storage account create --help
+
+# Rechercher des commandes de stockage
+az find "storage"
+```
 
 #### Concepts des Comptes de Stockage
 
@@ -669,6 +790,44 @@ Azure Compute est un ensemble de services cloud qui fournit des ressources de ca
 - **Disponibilité** : Haute disponibilité intégrée
 
 ### Virtual Machines
+
+#### Aide Virtual Machines
+
+**PowerShell - Aide VMs :**
+```powershell
+# Aide sur les commandes de VMs
+Get-Help *VM*
+
+# Aide spécifique sur la création de VM
+Get-Help New-AzVM -Detailed
+
+# Aide sur la gestion des VMs
+Get-Help Get-AzVM -Examples
+
+# Aide sur les disques de VM
+Get-Help *VMDisk* -Full
+
+# Rechercher des commandes VM
+Get-Help *VirtualMachine*
+```
+
+**Azure CLI - Aide VMs :**
+```bash
+# Aide sur les VMs
+az vm --help
+
+# Aide sur la création de VM
+az vm create --help
+
+# Aide sur la gestion des VMs
+az vm list --help
+
+# Aide sur les disques
+az vm disk --help
+
+# Rechercher des commandes VM
+az find "vm"
+```
 
 #### Concepts des Machines Virtuelles
 
@@ -1076,6 +1235,44 @@ Azure Virtual Network (VNet) est le service de mise en réseau fondamental d'Azu
 
 ### Virtual Networks
 
+#### Aide Virtual Networks
+
+**PowerShell - Aide Réseau :**
+```powershell
+# Aide sur les commandes de réseau
+Get-Help *Network*
+
+# Aide spécifique sur les VNets
+Get-Help New-AzVirtualNetwork -Detailed
+
+# Aide sur les NSGs
+Get-Help *NetworkSecurityGroup* -Examples
+
+# Aide sur les sous-réseaux
+Get-Help *Subnet* -Full
+
+# Rechercher des commandes réseau
+Get-Help *VirtualNetwork*
+```
+
+**Azure CLI - Aide Réseau :**
+```bash
+# Aide sur les VNets
+az network vnet --help
+
+# Aide sur les NSGs
+az network nsg --help
+
+# Aide sur les sous-réseaux
+az network vnet subnet --help
+
+# Aide sur une sous-commande spécifique
+az network vnet create --help
+
+# Rechercher des commandes réseau
+az find "network"
+```
+
 #### Concepts des Réseaux Virtuels
 
 **Qu'est-ce qu'un VNet ?**
@@ -1260,6 +1457,44 @@ Set-AzNetworkSecurityGroup -NetworkSecurityGroup $nsg
 ## 📊 5. Monitor and Back Up Azure Resources
 
 ### Concepts de Surveillance Azure
+
+#### Aide Surveillance
+
+**PowerShell - Aide Monitor :**
+```powershell
+# Aide sur les commandes de surveillance
+Get-Help *Monitor*
+
+# Aide spécifique sur les métriques
+Get-Help Get-AzMetric -Detailed
+
+# Aide sur les alertes
+Get-Help *Alert* -Examples
+
+# Aide sur les logs
+Get-Help Get-AzLog -Full
+
+# Rechercher des commandes de surveillance
+Get-Help *Monitor*
+```
+
+**Azure CLI - Aide Monitor :**
+```bash
+# Aide sur Azure Monitor
+az monitor --help
+
+# Aide sur les métriques
+az monitor metrics --help
+
+# Aide sur les alertes
+az monitor metrics alert --help
+
+# Aide sur les logs d'activité
+az monitor activity-log --help
+
+# Rechercher des commandes de surveillance
+az find "monitor"
+```
 
 **Qu'est-ce qu'Azure Monitor ?**
 Azure Monitor est une plateforme complète de surveillance qui collecte, analyse et agit sur les données de télémétrie de vos applications et ressources Azure.
