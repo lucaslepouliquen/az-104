@@ -25,6 +25,49 @@ The AZ-104 exam validates your skills as an Azure Administrator. It covers subsc
 
 ### Azure Active Directory (Azure AD / Entra ID)
 
+#### Migration des Commandes PowerShell
+
+**⚠️ Important : Commandes Dépréciées**
+Microsoft a déprécié le module `AzureAD` PowerShell. Utilisez maintenant le module `Az` avec les commandes `AzAD*` :
+
+**Commandes Dépréciées → Modernes :**
+- `Connect-AzureAD` → `Connect-AzAccount`
+- `Get-AzureADUser` → `Get-AzADUser`
+- `New-AzureADUser` → `New-AzADUser`
+- `Set-AzureADUser` → `Update-AzADUser`
+- `Remove-AzureADUser` → `Remove-AzADUser`
+- `Get-AzureADGroup` → `Get-AzADGroup`
+- `New-AzureADGroup` → `New-AzADGroup`
+- `Add-AzureADGroupMember` → `Add-AzADGroupMember`
+- `Remove-AzureADGroupMember` → `Remove-AzADGroupMember`
+
+**Installation du Module Az :**
+```powershell
+# Installer le module Az
+Install-Module -Name Az -AllowClobber -Force
+
+# Importer le module
+Import-Module Az
+
+# Se connecter à Azure
+Connect-AzAccount
+```
+
+**Permissions Requises :**
+Pour utiliser les commandes `Get-AzADUser`, vous devez avoir les permissions appropriées :
+- **Global Administrator** ou
+- **User Administrator** ou
+- **Directory Readers** (pour la lecture uniquement)
+
+**Vérification des Permissions :**
+```powershell
+# Vérifier votre rôle actuel
+Get-AzRoleAssignment -SignInName (Get-AzContext).Account.Id
+
+# Vérifier si vous pouvez lister les utilisateurs
+Get-AzADUser -First 1
+```
+
 #### Concepts Fondamentaux
 
 **Qu'est-ce qu'Azure AD ?**
@@ -77,26 +120,26 @@ az ad user update --id "john.doe@yourdomain.com" --password "NewPassword123!" --
 
 **PowerShell:**
 ```powershell
-# Connect to Azure AD
-Connect-AzureAD
+# Connect to Azure AD (modern approach)
+Connect-AzAccount
 
 # Create a user
-$passwordProfile = New-Object -TypeName Microsoft.Open.AzureAD.Model.PasswordProfile
+$passwordProfile = New-Object -TypeName Microsoft.Azure.PowerShell.Cmdlets.Resources.MSGraph.Models.ApiV10.IMicrosoftGraphPasswordProfile
 $passwordProfile.Password = "TempPassword123!"
-$passwordProfile.ForceChangePasswordNextLogin = $true
-New-AzureADUser -DisplayName "John Doe" -PasswordProfile $passwordProfile -UserPrincipalName "john.doe@yourdomain.com" -AccountEnabled $true -MailNickName "johndoe"
+$passwordProfile.ForceChangePasswordNextSignIn = $true
+New-AzADUser -DisplayName "John Doe" -PasswordProfile $passwordProfile -UserPrincipalName "john.doe@yourdomain.com" -AccountEnabled $true -MailNickName "johndoe"
 
 # List all users
-Get-AzureADUser
+Get-AzADUser
 
 # Get user details
-Get-AzureADUser -ObjectId "john.doe@yourdomain.com"
+Get-AzADUser -UserPrincipalName "john.doe@yourdomain.com"
 
 # Update user
-Set-AzureADUser -ObjectId "john.doe@yourdomain.com" -DisplayName "John Smith"
+Update-AzADUser -UserPrincipalName "john.doe@yourdomain.com" -DisplayName "John Smith"
 
 # Delete user
-Remove-AzureADUser -ObjectId "john.doe@yourdomain.com"
+Remove-AzADUser -UserPrincipalName "john.doe@yourdomain.com"
 ```
 
 #### Group Management Commands
@@ -122,19 +165,19 @@ az ad group member list --group "IT Department" --output table
 **PowerShell:**
 ```powershell
 # Create a security group
-New-AzureADGroup -DisplayName "IT Department" -MailEnabled $false -SecurityEnabled $true -MailNickName "ITDept"
+New-AzADGroup -DisplayName "IT Department" -MailEnabled $false -SecurityEnabled $true -MailNickName "ITDept"
 
 # List all groups
-Get-AzureADGroup
+Get-AzADGroup
 
 # Add user to group
-Add-AzureADGroupMember -ObjectId "group-object-id" -RefObjectId "user-object-id"
+Add-AzADGroupMember -MemberObjectId "user-object-id" -TargetGroupObjectId "group-object-id"
 
 # Remove user from group
-Remove-AzureADGroupMember -ObjectId "group-object-id" -MemberId "user-object-id"
+Remove-AzADGroupMember -MemberObjectId "user-object-id" -GroupObjectId "group-object-id"
 
 # List group members
-Get-AzureADGroupMember -ObjectId "group-object-id"
+Get-AzADGroupMember -GroupObjectId "group-object-id"
 ```
 
 ### Role-Based Access Control (RBAC)
