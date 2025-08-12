@@ -479,6 +479,328 @@ New-AzPolicyAssignment -Name "my-assignment" -DisplayName "My Assignment" -Polic
 Get-AzPolicyState
 ```
 
+### Azure Tags
+
+#### Découverte des Commandes Tags
+
+**PowerShell - Aide Tags :**
+```powershell
+# Aide sur les commandes de gestion des ressources
+Get-Help *Resource*
+
+# Aide spécifique sur les tags
+Get-Help Set-AzResource -Parameter Tag -Detailed
+
+# Aide sur la gestion des ressources
+Get-Help Get-AzResource -Examples
+
+# Rechercher des commandes liées aux tags
+Get-Help *Tag*
+```
+
+**Azure CLI - Aide Tags :**
+```bash
+# Aide sur les ressources
+az resource --help
+
+# Aide sur les tags
+az resource tag --help
+
+# Aide sur la gestion des ressources
+az resource show --help
+
+# Rechercher des commandes liées aux tags
+az find "tag"
+```
+
+**Découverte des Commandes Tags :**
+```powershell
+# PowerShell - Commandes de gestion des ressources
+Get-Command *Resource*
+Get-Command *Tag*
+```
+
+```bash
+# Azure CLI - Explorer les commandes de ressources
+az resource --help
+az resource tag --help
+```
+
+#### Concepts des Tags Azure
+
+**Qu'est-ce qu'un Tag Azure ?**
+Les tags Azure sont des paires clé-valeur qui vous permettent de catégoriser et organiser vos ressources Azure pour la gestion, la facturation et l'optimisation.
+
+**Avantages des Tags**
+- **Organisation** : Catégorisation logique des ressources
+- **Facturation** : Suivi des coûts par projet/département
+- **Gouvernance** : Application de politiques et contrôles
+- **Automatisation** : Scripts basés sur les tags
+- **Conformité** : Respect des standards organisationnels
+- **Recherche** : Filtrage et recherche de ressources
+- **Reporting** : Génération de rapports organisés
+
+**Bonnes Pratiques de Tagging**
+- **Convention de nommage** : Standardiser les noms de tags
+- **Tags obligatoires** : Environment, Project, Owner, CostCenter
+- **Valeurs cohérentes** : Utiliser des valeurs standardisées
+- **Documentation** : Documenter la stratégie de tagging
+- **Audit régulier** : Vérifier la conformité des tags
+- **Limites** : Maximum 50 tags par ressource
+- **Caractères** : Éviter les caractères spéciaux
+
+**Types de Tags Recommandés**
+
+**Tags Organisationnels:**
+- `Environment`: Production, Development, Testing, Staging
+- `Project`: Nom du projet ou application
+- `Department`: IT, Finance, Marketing, HR
+- `CostCenter`: Code de centre de coût
+- `Owner`: Responsable de la ressource
+- `BusinessUnit`: Unité métier
+
+**Tags Techniques:**
+- `Backup`: Yes, No, Daily, Weekly
+- `SecurityLevel`: Public, Internal, Confidential, Restricted
+- `Compliance`: SOX, HIPAA, GDPR, PCI
+- `DataClassification`: Public, Internal, Confidential, Restricted
+- `Tier`: Critical, Important, Standard, Low
+
+**Tags Opérationnels:**
+- `MaintenanceWindow`: Heures de maintenance
+- `AutoShutdown`: Yes, No
+- `Monitoring`: Enabled, Disabled
+- `Alerting`: Critical, Warning, Info
+- `SupportLevel`: 24x7, BusinessHours, OnCall
+
+#### Commandes de Gestion des Tags
+
+**Azure CLI:**
+```bash
+# Ajouter des tags à une ressource
+az resource tag --tags "Environment=Production" "Project=WebApp" "Owner=ITTeam" --name "myVM" --resource-group "myResourceGroup" --resource-type "Microsoft.Compute/virtualMachines"
+
+# Lister les tags d'une ressource
+az resource show --name "myVM" --resource-group "myResourceGroup" --resource-type "Microsoft.Compute/virtualMachines" --query "tags"
+
+# Mettre à jour les tags
+az resource tag --tags "Environment=Production" "Project=WebApp" "Owner=ITTeam" "CostCenter=IT001" --name "myVM" --resource-group "myResourceGroup" --resource-type "Microsoft.Compute/virtualMachines"
+
+# Supprimer des tags (remplacer par un sous-ensemble)
+az resource tag --tags "Environment=Production" "Project=WebApp" --name "myVM" --resource-group "myResourceGroup" --resource-type "Microsoft.Compute/virtualMachines"
+
+# Lister toutes les ressources avec un tag spécifique
+az resource list --tag "Environment=Production" --output table
+
+# Lister toutes les ressources d'un groupe avec leurs tags
+az resource list --resource-group "myResourceGroup" --query "[].{Name:name, Type:type, Tags:tags}" --output table
+
+# Lister toutes les ressources avec plusieurs tags
+az resource list --tag "Environment=Production" "Project=WebApp" --output table
+
+# Compter les ressources par tag
+az resource list --tag "Environment=Production" --query "length(@)" --output tsv
+
+# Lister les valeurs uniques d'un tag
+az resource list --query "[].tags.Environment" --output tsv | sort | uniq
+
+# Ajouter des tags à toutes les ressources d'un groupe
+for resource in $(az resource list --resource-group "myResourceGroup" --query "[].id" --output tsv); do
+    az resource tag --tags "Environment=Production" "Project=WebApp" --ids "$resource"
+done
+
+# Supprimer tous les tags d'une ressource
+az resource tag --tags "" --name "myVM" --resource-group "myResourceGroup" --resource-type "Microsoft.Compute/virtualMachines"
+```
+
+**PowerShell:**
+```powershell
+# Ajouter des tags à une ressource
+$tags = @{
+    "Environment" = "Production"
+    "Project" = "WebApp"
+    "Owner" = "ITTeam"
+}
+Set-AzResource -ResourceId "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM" -Tag $tags
+
+# Obtenir les tags d'une ressource
+$resource = Get-AzResource -ResourceId "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM"
+$resource.Tags
+
+# Mettre à jour les tags
+$tags = @{
+    "Environment" = "Production"
+    "Project" = "WebApp"
+    "Owner" = "ITTeam"
+    "CostCenter" = "IT001"
+}
+Set-AzResource -ResourceId "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM" -Tag $tags
+
+# Lister toutes les ressources avec un tag spécifique
+Get-AzResource -Tag @{"Environment"="Production"}
+
+# Lister toutes les ressources d'un groupe avec leurs tags
+Get-AzResource -ResourceGroupName "myResourceGroup" | Select-Object Name, ResourceType, @{Name="Tags";Expression={$_.Tags}}
+
+# Lister toutes les ressources avec plusieurs tags
+Get-AzResource -Tag @{"Environment"="Production"; "Project"="WebApp"}
+
+# Compter les ressources par tag
+(Get-AzResource -Tag @{"Environment"="Production"}).Count
+
+# Lister les valeurs uniques d'un tag
+(Get-AzResource).Tags.Environment | Sort-Object -Unique
+
+# Ajouter des tags à toutes les ressources d'un groupe
+$resources = Get-AzResource -ResourceGroupName "myResourceGroup"
+$tags = @{
+    "Environment" = "Production"
+    "Project" = "WebApp"
+}
+foreach ($resource in $resources) {
+    Set-AzResource -ResourceId $resource.ResourceId -Tag $tags
+}
+
+# Supprimer tous les tags d'une ressource
+Set-AzResource -ResourceId "/subscriptions/subscription-id/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVM" -Tag @{}
+```
+
+#### Scripts Avancés de Gestion des Tags
+
+**Script PowerShell pour Audit des Tags:**
+```powershell
+# Audit des tags dans un groupe de ressources
+function Audit-Tags {
+    param(
+        [string]$ResourceGroupName
+    )
+    
+    $resources = Get-AzResource -ResourceGroupName $ResourceGroupName
+    $results = @()
+    
+    foreach ($resource in $resources) {
+        $tagCount = if ($resource.Tags) { $resource.Tags.Count } else { 0 }
+        $requiredTags = @("Environment", "Project", "Owner", "CostCenter")
+        $missingTags = @()
+        
+        foreach ($requiredTag in $requiredTags) {
+            if (-not $resource.Tags.ContainsKey($requiredTag)) {
+                $missingTags += $requiredTag
+            }
+        }
+        
+        $results += [PSCustomObject]@{
+            ResourceName = $resource.Name
+            ResourceType = $resource.ResourceType
+            TagCount = $tagCount
+            MissingTags = ($missingTags -join ", ")
+            Compliant = ($missingTags.Count -eq 0)
+        }
+    }
+    
+    return $results
+}
+
+# Utilisation
+$auditResults = Audit-Tags -ResourceGroupName "myResourceGroup"
+$auditResults | Format-Table -AutoSize
+```
+
+**Script Azure CLI pour Standardisation des Tags:**
+```bash
+#!/bin/bash
+# Script pour standardiser les tags dans un groupe de ressources
+
+RESOURCE_GROUP="myResourceGroup"
+ENVIRONMENT="Production"
+PROJECT="WebApp"
+OWNER="ITTeam"
+COST_CENTER="IT001"
+
+# Fonction pour ajouter des tags standardisés
+standardize_tags() {
+    local resource_id="$1"
+    echo "Standardizing tags for resource: $resource_id"
+    
+    az resource tag \
+        --tags "Environment=$ENVIRONMENT" \
+               "Project=$PROJECT" \
+               "Owner=$OWNER" \
+               "CostCenter=$COST_CENTER" \
+        --ids "$resource_id"
+}
+
+# Lister toutes les ressources et appliquer les tags
+echo "Standardizing tags for all resources in $RESOURCE_GROUP..."
+az resource list \
+    --resource-group "$RESOURCE_GROUP" \
+    --query "[].id" \
+    --output tsv | while read -r resource_id; do
+    standardize_tags "$resource_id"
+done
+
+echo "Tag standardization completed!"
+```
+
+#### Intégration avec Azure Policy
+
+**Définition de Politique pour Tags Obligatoires:**
+```json
+{
+  "properties": {
+    "displayName": "Require specified tags on resources",
+    "description": "Enforces the existence of required tags on resources",
+    "mode": "all",
+    "parameters": {
+      "tagName1": {
+        "type": "String",
+        "metadata": {
+          "displayName": "First tag name",
+          "description": "Name of the first tag"
+        }
+      },
+      "tagName2": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Second tag name",
+          "description": "Name of the second tag"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "not": {
+          "field": "tags",
+          "containsKey": "[parameters('tagName1')]"
+        }
+      },
+      "then": {
+        "effect": "deny"
+      }
+    }
+  }
+}
+```
+
+**Application de la Politique:**
+```bash
+# Créer la définition de politique
+az policy definition create \
+    --name "require-tags" \
+    --display-name "Require specified tags" \
+    --description "Enforces the existence of required tags" \
+    --rules "policy-rules.json" \
+    --params "policy-params.json"
+
+# Assigner la politique
+az policy assignment create \
+    --name "require-tags-assignment" \
+    --display-name "Require Environment and Project tags" \
+    --policy "require-tags" \
+    --params '{"tagName1": "Environment", "tagName2": "Project"}' \
+    --scope "/subscriptions/subscription-id/resourceGroups/myResourceGroup"
+```
+
 ### Subscription Management
 
 #### Concepts de Gestion des Abonnements
