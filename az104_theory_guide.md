@@ -56,6 +56,39 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **MX** : Alternative acceptable
 - Exemple : `MS=ms12345678` dans un enregistrement TXT
 
+#### Licensing et Dynamic Groups
+
+**🎯 Processus d'assignation automatique de licences :**
+1. **Créer un groupe de sécurité dynamique** basé sur des attributs personnalisés
+2. **Configurer les règles** du groupe dynamique
+3. **Ajouter le groupe à un groupe de licences** pour synchronisation automatique
+4. **Tous les utilisateurs** du groupe reçoivent automatiquement la licence
+
+**🎯 Points clés identifiés :**
+- **Dynamic security groups** : Obligatoires pour assignation automatique
+- **Custom attributes** : Base des règles de groupe
+- **License groups** : Synchronisation automatique requise
+- **Automatic assignment policies** : Non utilisées pour les licences
+
+#### B2B Collaboration
+
+**🎯 Configuration des paramètres de collaboration externe :**
+- **External collaboration settings** : Contrôlent qui peut inviter des utilisateurs externes
+- **Domain restrictions** : Autoriser/bloquer des domaines spécifiques
+- **Guest user visibility** : Contrôler ce que voient les invités dans l'annuaire
+- **Conditional Access** : Renforcer l'authentification et bloquer l'accès depuis des emplacements inconnus
+- **Cross-tenant access** : Configuration de collaboration avec des organisations Microsoft Entra spécifiques
+
+**🎯 Format UPN des utilisateurs invités :**
+- **Guest users** : `bsmith_contoso.com#EXT#@fabrikam.com`
+- **Regular users** : `user@fabrikam.com`
+- **Access reviews** : Non utilisées pour contrôler les invitations d'invités
+
+**🎯 Prérequis pour assignation de licences :**
+- **Usage location** : Obligatoire avant assignation de licence
+- **Not all Microsoft 365 services** disponibles dans tous les emplacements
+- **First name, Last name, Other email, User type** : Non obligatoires pour assignation de licence
+
 ### 1.2 Role-Based Access Control (RBAC)
 
 #### Rôles Built-in Essentiels
@@ -68,6 +101,28 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **Virtual Machine Contributor** : Gestion des VMs
 - **Storage Account Contributor** : Gestion des comptes de stockage
 - **Network Contributor** : Gestion des ressources réseau
+
+**🎯 Différenciation des rôles essentiels :**
+
+**Contributor**
+- **Création et gestion** : Tous types de ressources
+- **Limitation** : Ne peut pas déléguer l'accès à d'autres utilisateurs
+- **Usage** : Développement et administration des ressources
+
+**Reader**
+- **Visualisation** : Ressources Azure existantes
+- **Aucune action** : Pas d'actions autorisées sur les ressources
+- **Usage** : Monitoring et audit
+
+**API Management Service Contributor**
+- **Scope limité** : Services API Management et APIs uniquement
+- **Gestion spécialisée** : Configuration et maintenance des APIs
+- **Usage** : Administration des services API
+
+**Owner**
+- **Accès complet** : Toutes les ressources
+- **Délégation** : Possibilité de déléguer l'accès à d'autres utilisateurs
+- **Usage** : Administration complète avec gestion des accès
 
 #### Scopes d'assignation
 1. **Management Group** : Niveau le plus élevé
@@ -118,6 +173,22 @@ Root Management Group
 - **10,000 management groups** par tenant
 - Chaque subscription dans un seul management group
 
+#### Resource Locks
+
+**🎯 Types de verrous et limitations :**
+
+**Delete Locks**
+- **Protection** : Bloque la suppression de ressources
+- **Ressources supportées** : Virtual machines, subscriptions, resource groups
+- **Ressources non supportées** : Management groups, storage account data
+- **Usage** : Protection contre suppression accidentelle
+
+**🎯 Points clés identifiés :**
+- **Delete locks** : Empêchent la suppression mais pas la modification
+- **Management groups** : Ne peuvent pas être verrouillés
+- **Storage account data** : Données non protégées par les locks
+- **Scope** : Applicable aux VMs, subscriptions, et resource groups uniquement
+
 ---
 
 ## 2. Implement and Manage Storage (15-20%)
@@ -160,7 +231,7 @@ Root Management Group
 
 **Local Redundant Storage (LRS)**
 - 3 copies dans le même datacenter
-- Durabilité : 99.999999999% (11 nines)
+- Durabilité : 99.999 999 999% (11 nines)
 - Protection : Pannes matérielles
 
 **Zone Redundant Storage (ZRS)**
@@ -174,9 +245,19 @@ Root Management Group
 - Durabilité : 99.99999999999999% (16 nines)
 - Protection : Panne régionale
 
+**Geo-Zone-Redundant Storage (GZRS)**
+- ZRS dans région primaire + 3 copies dans région secondaire
+- Durabilité : 99.99999999999999% (16 nines)
+- Protection : Panne régionale + panne de zone
+- **Limitation** : Pas disponible dans toutes les régions
+
 **Read-Access GRS (RA-GRS)**
 - Comme GRS + accès lecture sur région secondaire
 - Useful pour applications nécessitant haute disponibilité lecture
+
+**Read-Access GZRS (RA-GZRS)**
+- Comme GZRS + accès lecture sur région secondaire
+- Combinaison de haute disponibilité et résilience géographique
 
 ### 2.2 Azure Files
 
@@ -229,6 +310,37 @@ Root Management Group
 - **AzCopy** : Outil ligne de commande
 - **Azure Storage Explorer** : Interface graphique
 - **Data Box** : Appliances physiques (TB vers PB)
+
+#### Storage Account Roles et Permissions
+
+**🎯 Rôles de gestion des comptes de stockage :**
+
+**Storage Account Contributor**
+- **Gestion complète** des comptes de stockage
+- **Accès aux clés** de compte (Shared Key authorization)
+- **Permissions** : Lecture, écriture, suppression des comptes de stockage
+- **Usage** : Administration des comptes de stockage
+
+**Storage Blob Data Contributor**
+- **Permissions sur les données** : Lecture, écriture, suppression
+- **Scope** : Containers et blobs Azure Storage
+- **Usage** : Accès aux données blob sans gestion du compte
+
+**Reader**
+- **Lecture seule** : Visualisation de toutes les ressources
+- **Aucune modification** : Pas de changements autorisés
+- **Usage** : Monitoring et audit
+
+**Owner**
+- **Accès complet** : Gestion de toutes les ressources
+- **Délégation d'accès** : Possibilité d'assigner des rôles
+- **Usage** : Administration complète
+
+**🎯 Différenciation clé identifiée :**
+- **Storage Account Contributor** : Gestion du compte + accès aux clés
+- **Storage Blob Data Contributor** : Accès aux données uniquement
+- **Reader** : Visualisation sans modification
+- **Owner** : Contrôle total + délégation d'accès
 
 ---
 
@@ -487,6 +599,29 @@ Root Management Group
 - **Storage** : Metrics store, Log Analytics workspace
 - **Analysis** : KQL queries, workbooks, dashboards
 - **Actions** : Alerts, autoscale, automation
+
+#### Cost Management et Budgets
+
+**🎯 Configuration des budgets et actions automatiques :**
+
+**Processus d'édition de budget :**
+1. **Cost Management + Billing** → **Budgets**
+2. **Éditer le budget** associé aux ressources du groupe de ressources
+3. **Créer un nouveau Action Group** de type **Runbook**
+4. **Choisir "Stop VM"** comme action
+
+**🎯 Points clés identifiés :**
+- **Cost analysis** : Ne peut pas arrêter automatiquement les VMs
+- **Scale Up VM action group** : Non requis pour arrêter les VMs
+- **Runbook type** : Obligatoire pour actions d'automatisation
+- **Stop VM action** : Action spécifique pour arrêter les machines virtuelles
+
+**🎯 Azure Advisor - Cost Optimization :**
+- **Cost blade** : Optimisation et réduction des dépenses Azure
+- **Identification** : VMs sous-utilisées
+- **Performance blade** : Amélioration de la vitesse des applications
+- **High availability** : Non disponible via Azure Advisor
+- **Operational Excellence** : Efficacité des processus et workflows, gestion des ressources, meilleures pratiques de déploiement
 
 **🎯 Concept clé identifié :** Target Resource pour alertes
 - **VM Events/Syslog** → Target = **Log Analytics Workspace**
