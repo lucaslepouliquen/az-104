@@ -398,6 +398,18 @@ Root Management Group
 - **Managed Disks** : Obligatoire
 - **Availability Options** : Doit être configuré à la création
 
+#### Accès Externe aux VMs
+**🎯 Cas d'usage identifié :** Accès externe avec effort administratif minimal
+- **Scénario** : VM interne accessible uniquement depuis le réseau interne, besoin d'accès externe
+- **Solution optimale** : Ajouter une adresse IP publique à la VM
+- **Avantage** : Configuration simple et directe, effort administratif minimal
+
+**🎯 Erreur fréquente identifiée :** Complexité inutile pour accès externe simple
+- **❌ Erreur** : Configurer un VPN Site-to-Site pour un accès externe simple
+- **✅ Correct** : Utiliser une adresse IP publique pour minimiser l'effort administratif
+- **Raison** : VPN S2S = Configuration complexe (Local Network Gateway, Connection, etc.)
+- **Alternative** : IP publique = Configuration simple et directe
+
 ### 3.2 Virtual Machine Scale Sets (VMSS)
 
 #### Concepts Clés
@@ -505,6 +517,18 @@ Root Management Group
 - **Usage** : Résolution entre VMs dans VNet
 - **Custom DNS** : Possibilité d'utiliser ses propres serveurs
 
+#### User-Defined Routes (UDR)
+**🎯 Cas d'usage identifié :** Redirection de trafic vers appliances réseau
+- **Objectif** : Forcer le trafic à passer par des appliances spécifiques (firewalls, appliances d'inspection)
+- **Mécanisme** : Azure crée automatiquement une table de routage pour chaque sous-réseau avec des routes système par défaut
+- **Override** : Les UDR permettent de remplacer certaines routes système Azure
+- **Application** : Le trafic sortant d'un sous-réseau suit les routes de la table de routage du sous-réseau
+
+**🎯 Erreur fréquente identifiée :** Confusion entre routes système et UDR
+- **❌ Erreur** : Essayer de modifier les routes système par défaut
+- **✅ Correct** : Créer des User-Defined Routes pour rediriger le trafic
+- **Principe** : Les routes système sont gérées par Azure, les UDR permettent de surcharger le comportement
+
 ### 4.2 Network Security Groups (NSG)
 
 #### Règles de Sécurité
@@ -576,6 +600,18 @@ Root Management Group
 - **Local Network Gateway** : Représentation on-premises
 - **Connection** : Lien entre les gateways
 - **Protocols** : IKEv1, IKEv2, SSTP
+
+**🎯 Cas d'usage identifié :** Connexions chiffrées on-premises
+- **Scénario** : Activer la connectivité VNet vers ressources on-premises avec connexion chiffrée
+- **Solution** : Configurer une Virtual Network Gateway (VPN Gateway)
+- **Mécanisme** : Envoie du trafic chiffré entre un réseau virtuel et un emplacement on-premises via connexion publique
+- **Configuration** : Dépend de plusieurs ressources avec paramètres configurables
+
+**🎯 Erreur fréquente identifiée :** Confusion entre Private Endpoints et VPN Gateways
+- **❌ Erreur** : Utiliser des Private Endpoints pour la connectivité on-premises
+- **✅ Correct** : Utiliser des Virtual Network Gateways pour les connexions chiffrées
+- **Différenciation** : Private Endpoints = Accès privé aux services Azure
+- **Usage** : VPN Gateways = Connexions chiffrées vers on-premises
 
 #### Point-to-Site VPN
 - **Client certificates** : Authentification par certificat
