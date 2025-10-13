@@ -506,10 +506,30 @@ Root Management Group
 - **Network Security Groups** : Firewalls au niveau subnet/NIC
 
 #### VNet Peering
+
+**Types de Peering :**
 - **Regional** : VNets dans la même région
 - **Global** : VNets dans différentes régions
 - **Traffic** : Privé, pas d'Internet, faible latence
 - **Billing** : Facturation du trafic cross-region
+
+**🎯 Tips critiques identifiés :**
+
+**1. Règle d'Or : Plages d'adresses non-chevauchantes**
+- **Principe** : Deux VNets ne peuvent être peerés que si leurs plages d'adresses ne se chevauchent pas
+- **Exemple critique** : VNet1 (192.168.0.0/24) ne peut PAS être peeré avec VNet3 (192.168.0.0/16)
+- **Raison** : /24 est inclus dans /16 → chevauchement détecté
+- **Solution** : Utiliser des plages complètement différentes (ex: 10.0.0.0/16 vs 172.16.0.0/16)
+
+**2. Performance et Latence**
+- **Avantage clé** : Communication avec la même latence et bande passante que si les ressources étaient sur le même VNet
+- **Trafic privé** : Pas de transit par Internet, sécurité renforcée
+- **Optimisation** : Idéal pour architectures distribuées (prod/dev, multi-régions)
+
+**3. Configuration dans le Portail Azure**
+- **Navigation** : VNet → Peerings → Add peering
+- **Bidirectionnel** : Créer le peering dans les deux sens
+- **Validation** : Azure vérifie automatiquement la compatibilité des plages
 
 #### DNS Resolution
 **🎯 Point identifié :** DNS interne Azure
@@ -530,6 +550,7 @@ Root Management Group
 - **Principe** : Les routes système sont gérées par Azure, les UDR permettent de surcharger le comportement
 
 ### 4.2 Network Security Groups (NSG)
+Can be used with subnet or NIC
 
 #### Règles de Sécurité
 - **Priority** : 100-4096, plus bas = plus prioritaire
@@ -540,6 +561,26 @@ Root Management Group
 - **Un NSG peut être associé à plusieurs ressources**
 - **5 VMs avec mêmes règles = 5 NICs + 1 NSG**
 - Partage possible entre subnets et NICs
+
+**🎯 Tips critiques identifiés :**
+
+**1. Système de Priorités NSG**
+- **Règle fondamentale** : Plus le numéro de priorité est bas, plus la règle est prioritaire
+- **Exemple critique** : Priority 100 > Priority 200 (100 est plus prioritaire)
+- **Impact** : Une règle Deny avec priorité élevée (100) bloque une règle Allow avec priorité faible (200)
+- **Solution** : Ajuster les priorités ou modifier l'action de la règle
+
+**2. Évaluation en Cascade : Subnet → NIC**
+- **Ordre d'évaluation** : NSG du Subnet d'abord, puis NSG de la NIC
+- **Principe** : Les deux niveaux doivent autoriser le trafic pour qu'il passe
+- **Piège courant** : NSG Subnet Allow + NSG NIC Deny = Trafic bloqué
+- **Optimisation** : Un seul NSG Deny à n'importe quel niveau bloque tout le trafic
+
+**3. Stratégies de Résolution de Problèmes**
+- **Diagnostic** : Vérifier les NSG aux deux niveaux (Subnet et NIC)
+- **Priorités** : Identifier les règles conflictuelles par numéro de priorité
+- **Actions** : Modifier la priorité OU changer l'action (Allow/Deny)
+- **Test** : Utiliser Network Watcher pour valider les règles
 
 #### Default Rules
 **Inbound :**
@@ -558,6 +599,26 @@ Root Management Group
 - **Internal** : Trafic interne au VNet
 - **Public** : Trafic depuis Internet
 - **Features** : Health probes, NAT rules, HA ports
+
+**🎯 Tips critiques identifiés :**
+
+**1. Session Persistence (Sticky Sessions) - Concept Clé**
+- **Problème résolu** : Maintenir l'utilisateur sur le même serveur backend
+- **Cas d'usage critique** : Applications avec état (paniers e-commerce, sessions utilisateur)
+- **Configuration** : Client IP + Protocol pour une persistance optimale
+- **Alternative** : None = distribution aléatoire (pas de persistance)
+
+**2. Différenciation des Options de Load Balancer**
+- **Session Persistence** : Contrôle la distribution des sessions utilisateur
+- **NAT Rules** : Redirection de trafic spécifique (différent de la session persistence)
+- **Health Probes** : Vérification de l'état des backends
+- **Load Balancing Rules** : Définition des pools et méthodes de distribution
+
+**3. Stratégies de Configuration**
+- **Client IP** : Persistance basée sur l'adresse IP source
+- **Protocol** : Persistance basée sur le protocole (HTTP/HTTPS)
+- **Combinaison** : Client IP + Protocol pour une persistance maximale
+- **Performance** : Équilibrer entre persistance et répartition de charge
 
 #### Application Gateway (Layer 7)
 - **WAF** : Web Application Firewall
@@ -579,6 +640,26 @@ Root Management Group
 - **Granularity** : Métriques par minute
 - **Targets** : VM, FQDN, URI, IPv4
 - **Protocols** : TCP direct
+
+**🎯 Tips critiques identifiés :**
+
+**1. Commandes de Diagnostic Spécialisées**
+- **`netstat -an`** : Diagnostic des ports d'écoute (essentiel pour troubleshooting)
+- **`Test-NetConnection`** : Tests de connectivité modernes (remplace ping)
+- **`nbtstat -c`** : Diagnostic NetBIOS (legacy, moins fréquent)
+- **`Get-AzVirtualNetworkUsageList`** : PowerShell Azure (pas de diagnostic réseau)
+
+**2. Stratégie de Diagnostic par Couche**
+- **Couche Application** : `netstat -an` pour ports d'écoute
+- **Couche Transport** : `Test-NetConnection` pour tests TCP/UDP
+- **Couche Réseau** : `ping` ou `Test-NetConnection` pour ICMP
+- **Couche Application** : `nslookup` pour résolution DNS
+
+**3. Outils Azure vs Outils Système**
+- **Azure PowerShell** : `Get-Az*` pour gestion des ressources Azure
+- **Outils Windows** : `netstat`, `Test-NetConnection` pour diagnostic réseau
+- **Outils Legacy** : `nbtstat`, `ping` pour compatibilité
+- **Règle** : Diagnostic réseau = outils système, pas PowerShell Azure
 
 #### Traffic Analytics
 **🎯 Ressources requises identifiées :**
@@ -758,6 +839,50 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 
 ---
 
+## 🎯 Tips Pratiques d'Examen - Insights des Questions Réelles
+
+### 4.5 Pièges Fréquents et Solutions
+
+#### VNet Peering - Erreurs de Plages d'Adresses
+**🎯 Piège identifié :** Confusion entre plages chevauchantes et non-chevauchantes
+- **Erreur courante** : Essayer de peerer 192.168.0.0/24 avec 192.168.0.0/16
+- **Raison** : /24 est inclus dans /16 → chevauchement détecté par Azure
+- **Solution** : Utiliser des plages complètement différentes (10.x.x.x vs 172.x.x.x)
+- **Validation** : Azure bloque automatiquement les peerings avec chevauchement
+
+#### NSG - Priorités et Évaluation en Cascade
+**🎯 Piège identifié :** Oublier l'évaluation en cascade Subnet → NIC
+- **Erreur courante** : NSG Subnet Allow + NSG NIC Deny = Trafic bloqué
+- **Raison** : Les deux niveaux doivent autoriser le trafic
+- **Solution** : Vérifier les NSG aux deux niveaux lors du troubleshooting
+- **Optimisation** : Un seul NSG Deny à n'importe quel niveau bloque tout
+
+#### Load Balancer - Session Persistence vs NAT Rules
+**🎯 Piège identifié :** Confusion entre session persistence et NAT rules
+- **Erreur courante** : Utiliser NAT rules pour maintenir les sessions utilisateur
+- **Raison** : NAT rules = redirection de trafic, Session persistence = maintien de session
+- **Solution** : Client IP + Protocol pour les applications avec état
+- **Cas d'usage** : E-commerce, applications avec paniers, sessions utilisateur
+
+#### Diagnostic Réseau - Outils Spécialisés
+**🎯 Piège identifié :** Utiliser les mauvais outils pour le diagnostic
+- **Erreur courante** : `Get-AzVirtualNetworkUsageList` pour diagnostic de ports
+- **Raison** : PowerShell Azure ≠ outils de diagnostic réseau
+- **Solution** : `netstat -an` pour ports d'écoute, `Test-NetConnection` pour connectivité
+- **Règle** : Diagnostic réseau = outils système Windows, pas cmdlets Azure
+
+### 4.6 Matrice de Décision Rapide
+
+| Problème | Diagnostic | Solution | Outil/Commande |
+|----------|------------|----------|----------------|
+| VNets ne communiquent pas | Vérifier plages d'adresses | VNet Peering | Portail Azure → Peerings |
+| Trafic bloqué | Vérifier NSG Subnet + NIC | Ajuster priorités | NSG → Rules → Priority |
+| Sessions perdues | Vérifier session persistence | Client IP + Protocol | Load Balancer → Settings |
+| Ports d'écoute | Diagnostic réseau | Vérifier services | `netstat -an` |
+| Connectivité Internet | Test de connectivité | Vérifier NSG outbound | `Test-NetConnection` |
+
+---
+
 ## 🎯 Points Critiques Basés sur Vos Erreurs
 
 ### 1. Log Analytics = Hub Central pour Monitoring
@@ -837,6 +962,10 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 - [ ] DNS interne : vm-name.internal.cloudapp.net
 - [ ] Traffic Analytics : Log Analytics + Storage Account
 - [ ] Connection Monitor pour RTT measurements
+- [ ] **VNet Peering** : Plages d'adresses non-chevauchantes obligatoires
+- [ ] **NSG Priorities** : Plus bas = plus prioritaire (100 < 200)
+- [ ] **Session Persistence** : Client IP + Protocol pour sticky sessions
+- [ ] **Commandes réseau** : `netstat -an` pour ports d'écoute
 
 ### Monitoring & Backup
 - [ ] Log Analytics Workspace comme target pour VM alerts
