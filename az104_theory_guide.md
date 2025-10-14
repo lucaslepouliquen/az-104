@@ -220,6 +220,59 @@ Root Management Group
 - **StorageV2** : Support Standard file shares uniquement
 - **BlobStorage** : Aucun support de file shares
 
+#### Services de Stockage Azure - Différences Clés
+
+**🎯 Comparaison des 4 services de stockage principaux :**
+
+**1. Blob Storage (Binary Large Objects)**
+- **Usage** : Stockage de fichiers non structurés (documents, images, vidéos, backups)
+- **Types de blobs** : Block, Page, Append
+- **Accès** : REST API, SDK, Azure Storage Explorer
+- **Cas d'usage** : Sites web statiques, archives, médias, sauvegardes
+- **Niveaux** : Hot, Cool, Archive (optimisation des coûts)
+
+**2. Azure Files (File Shares)**
+- **Usage** : Partages de fichiers réseau (comme un NAS/SAN cloud)
+- **Protocoles** : SMB 3.0/3.1, NFS 4.1 (Premium uniquement)
+- **Accès** : Mappage de lecteurs réseau, montage Linux
+- **Cas d'usage** : Migration d'applications on-premises, partage de fichiers entre VMs
+- **Port requis** : 445 TCP pour SMB
+
+**3. Azure Queues (Message Queuing)**
+- **Usage** : Messaging asynchrone entre composants d'application
+- **Fonctionnalités** : FIFO, TTL, visibility timeout
+- **Accès** : REST API, SDK
+- **Cas d'usage** : Découplage d'applications, traitement asynchrone, workflows
+- **Limite** : Messages jusqu'à 64 KB
+
+**4. Azure Tables (NoSQL Database)**
+- **Usage** : Base de données NoSQL pour données structurées
+- **Structure** : Entités avec propriétés (clé-valeur)
+- **Accès** : REST API, SDK, OData
+- **Cas d'usage** : Logs d'application, métadonnées, données de configuration
+- **Limite** : Entités jusqu'à 1 MB
+
+**🎯 Matrice de décision rapide :**
+
+| Besoin | Service | Raison |
+|--------|---------|--------|
+| Stocker des fichiers (images, docs) | **Blob Storage** | Optimisé pour fichiers non structurés |
+| Partager des fichiers entre VMs | **Azure Files** | Protocoles SMB/NFS natifs |
+| Communication asynchrone | **Azure Queues** | Messaging découplé |
+| Stocker des données structurées | **Azure Tables** | Base NoSQL simple |
+| Site web statique | **Blob Storage** | Hébergement web statique |
+| Migration d'applications | **Azure Files** | Compatibilité SMB |
+| Workflow de traitement | **Azure Queues** | Orchestration asynchrone |
+| Logs et métadonnées | **Azure Tables** | Stockage clé-valeur |
+
+**🎯 Points d'attention pour l'examen :**
+- **Blob Storage** : Le plus polyvalent, supporte tous les types de fichiers
+- **Azure Files** : Seul service avec protocoles réseau natifs (SMB/NFS)
+- **Azure Queues** : Seul service de messaging asynchrone
+- **Azure Tables** : Seule base de données NoSQL intégrée
+- **Performance** : Premium uniquement pour Blobs et Files
+- **Réplication** : Tous supportent LRS, certains limités pour ZRS/GRS
+
 #### Niveaux d'accès (Blob Storage)
 - **Hot** : Accès fréquent, coût stockage élevé, coût accès faible
 - **Cool** : Accès occasionnel (30 jours minimum), coût moyen
