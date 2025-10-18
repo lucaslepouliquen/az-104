@@ -215,14 +215,33 @@ Root Management Group
 - **Réplication** : LRS, ZRS uniquement
 - **Usage** : Partages de fichiers haute performance
 
-**🎯 Erreur identifiée :** FileStorage vs autres types
-- **Premium File Shares** : Uniquement supportées par **FileStorage accounts**
-- **StorageV2** : Support Standard file shares uniquement
-- **BlobStorage** : Aucun support de file shares
+**Erreur fréquente identifiée :** Confusion entre types de Storage Accounts pour Azure Files
+
+**Types de Storage Accounts et support Azure Files :**
+
+**FileStorage Accounts**
+- **Support** : Premium File Shares uniquement (SSD, haute performance)
+- **Usage** : Applications nécessitant des performances élevées
+- **Limitation** : Ne supporte PAS les Standard File Shares
+
+**General Purpose v2 (StorageV2)**
+- **Support** : Standard File Shares uniquement (HDD, performance standard)
+- **Usage** : Applications générales, partages de fichiers basiques
+- **Limitation** : Ne supporte PAS les Premium File Shares
+
+**BlobStorage Accounts**
+- **Support** : Aucun support d'Azure Files
+- **Usage** : Stockage de blobs uniquement
+- **Limitation** : Pas de file shares du tout
+
+**Piège d'examen courant :**
+- **Erreur** : Essayer de créer des Premium File Shares sur un compte StorageV2
+- **Correct** : Utiliser un FileStorage account pour les Premium File Shares
+- **Règle** : Type de compte = Type de file share supporté
 
 #### Services de Stockage Azure - Différences Clés
 
-**🎯 Comparaison des 4 services de stockage principaux :**
+**Comparaison des 4 services de stockage principaux :**
 
 **1. Blob Storage (Binary Large Objects)**
 - **Usage** : Stockage de fichiers non structurés (documents, images, vidéos, backups)
@@ -252,7 +271,7 @@ Root Management Group
 - **Cas d'usage** : Logs d'application, métadonnées, données de configuration
 - **Limite** : Entités jusqu'à 1 MB
 
-**🎯 Matrice de décision rapide :**
+**Matrice de décision rapide :**
 
 | Besoin | Service | Raison |
 |--------|---------|--------|
@@ -265,7 +284,7 @@ Root Management Group
 | Workflow de traitement | **Azure Queues** | Orchestration asynchrone |
 | Logs et métadonnées | **Azure Tables** | Stockage clé-valeur |
 
-**🎯 Points d'attention pour l'examen :**
+**Points d'attention pour l'examen :**
 - **Blob Storage** : Le plus polyvalent, supporte tous les types de fichiers
 - **Azure Files** : Seul service avec protocoles réseau natifs (SMB/NFS)
 - **Azure Queues** : Seul service de messaging asynchrone
@@ -566,7 +585,7 @@ Root Management Group
 - **Traffic** : Privé, pas d'Internet, faible latence
 - **Billing** : Facturation du trafic cross-region
 
-**🎯 Tips critiques identifiés :**
+**Tips critiques identifiés :**
 
 **1. Règle d'Or : Plages d'adresses non-chevauchantes**
 - **Principe** : Deux VNets ne peuvent être peerés que si leurs plages d'adresses ne se chevauchent pas
@@ -615,7 +634,7 @@ Can be used with subnet or NIC
 - **5 VMs avec mêmes règles = 5 NICs + 1 NSG**
 - Partage possible entre subnets et NICs
 
-**🎯 Tips critiques identifiés :**
+**Tips critiques identifiés :**
 
 **1. Système de Priorités NSG**
 - **Règle fondamentale** : Plus le numéro de priorité est bas, plus la règle est prioritaire
