@@ -357,7 +357,7 @@ Root Management Group
 #### Types de Blobs
 
 ** Comprendre les 3 types de blobs Azure - Points critiques pour l'examen :**
-
+                                         
 **1. Block Blobs**
 - **Usage principal** : Stockage de fichiers standard (documents, images, vidéos, archives)
 - **Structure** : Composés de blocs individuels (jusqu'à 50,000 blocs par blob)
@@ -417,10 +417,10 @@ Root Management Group
 ### 2.4 Data Transfer Solutions
 
 #### Azure Import/Export Service
-**🎯 Destinations supportées identifiées :**
-- ✅ **Azure Blob Storage**
-- ✅ **Azure Files** (max 5 TB)
-- ❌ SQL Database, autres services
+** Destinations supportées identifiées :**
+- **Azure Blob Storage**
+- **Azure Files** (max 5 TB)
+- SQL Database, autres services
 
 **Process :**
 1. Préparer les disques (BitLocker pour Windows)
@@ -435,7 +435,7 @@ Root Management Group
 
 #### Storage Account Roles et Permissions
 
-**🎯 Rôles de gestion des comptes de stockage :**
+** Rôles de gestion des comptes de stockage :**
 
 **Storage Account Contributor**
 - **Gestion complète** des comptes de stockage
@@ -458,7 +458,7 @@ Root Management Group
 - **Délégation d'accès** : Possibilité d'assigner des rôles
 - **Usage** : Administration complète
 
-**🎯 Différenciation clé identifiée :**
+** Différenciation clé identifiée :**
 - **Storage Account Contributor** : Gestion du compte + accès aux clés
 - **Storage Blob Data Contributor** : Accès aux données uniquement
 - **Reader** : Visualisation sans modification
@@ -479,18 +479,18 @@ Root Management Group
 
 #### Disques et Stockage
 
-**🎯 Erreur fréquente identifiée :** Disques temporaires vs persistants
+** Erreur fréquente identifiée :** Disques temporaires vs persistants
 
 **Disque C: (OS Disk)**
 - **Type** : Persistant (VHD dans Azure Storage)
 - **Contenu** : OS, applications installées
-- **Persistance** : ✅ Conservé lors redémarrages/arrêts
+- **Persistance** : Conservé lors redémarrages/arrêts
 - **Usage** : Applications, données importantes
 
 **Disque D: (Temporary Disk)**
 - **Type** : Temporaire (SSD local hyperviseur)
 - **Contenu** : Pagefile.sys par défaut
-- **Persistance** : ❌ **PERDU** lors maintenances/redéploiements
+- **Persistance** : **PERDU** lors maintenances/redéploiements
 - **Usage** : Cache, fichiers temporaires, TempDB
 
 **Disques de Données (E:, F:, etc.)**
@@ -516,19 +516,19 @@ Root Management Group
 - **SLA** : 99.99%
 - **Scope** : Région Azure
 
-**🎯 Prérequis identifiés pour Availability Zones :**
+** Prérequis identifiés pour Availability Zones :**
 - **Managed Disks** : Obligatoire
 - **Availability Options** : Doit être configuré à la création
 
 #### Accès Externe aux VMs
-**🎯 Cas d'usage identifié :** Accès externe avec effort administratif minimal
+** Cas d'usage identifié :** Accès externe avec effort administratif minimal
 - **Scénario** : VM interne accessible uniquement depuis le réseau interne, besoin d'accès externe
 - **Solution optimale** : Ajouter une adresse IP publique à la VM
 - **Avantage** : Configuration simple et directe, effort administratif minimal
 
-**🎯 Erreur fréquente identifiée :** Complexité inutile pour accès externe simple
-- **❌ Erreur** : Configurer un VPN Site-to-Site pour un accès externe simple
-- **✅ Correct** : Utiliser une adresse IP publique pour minimiser l'effort administratif
+** Erreur fréquente identifiée :** Complexité inutile pour accès externe simple
+- ** Erreur** : Configurer un VPN Site-to-Site pour un accès externe simple
+- ** Correct** : Utiliser une adresse IP publique pour minimiser l'effort administratif
 - **Raison** : VPN S2S = Configuration complexe (Local Network Gateway, Connection, etc.)
 - **Alternative** : IP publique = Configuration simple et directe
 
@@ -539,7 +539,7 @@ Root Management Group
 - **Load balancing** : Intégré avec Azure Load Balancer
 - **Update management** : Rolling updates avec availability
 
-**🎯 Cas d'usage identifié :** Maintenance Azure
+** Cas d'usage identifié :** Maintenance Azure
 - Pour garantir **8 VMs minimum** pendant maintenance
 - Créer un **VMSS avec 10 instances**
 - Azure maintient une partie, les autres restent disponibles
@@ -559,14 +559,14 @@ Root Management Group
 - **Isolated** : I1, I2, I3 - Environnements dédiés
 
 #### Runtime Stacks et OS
-**🎯 Point clé identifié :** Un App Service = Un runtime
+** Point clé identifié :** Un App Service = Un runtime
 - Chaque App Service configuré pour **un seul runtime**
 - Python OU Java OU C# - pas de mix possible
 - Un Plan App Service peut héberger plusieurs App Services du même OS
 
 #### Deployment Slots
 
-**🎯 Workflow optimal identifié :**
+** Workflow optimal identifié :**
 1. **Deploy** → Déployer l'update sur staging slot
 2. **Test** → Tester l'application sur staging
 3. **Swap** → Basculer staging vers production
@@ -578,7 +578,7 @@ Root Management Group
 - **Configuration preservation** : Settings spécifiques aux slots
 
 #### Authentication et Authorization
-**🎯 Configuration identifiée :** Désactiver l'accès anonyme
+** Configuration identifiée :** Désactiver l'accès anonyme
 - Configurer **Authentication** dans App Service
 - Ajouter identity providers : Microsoft, Google, Facebook, Twitter
 - **Anonymous access** est une méthode d'authentification
@@ -611,7 +611,7 @@ Root Management Group
 }
 ```
 
-**🎯 Point identifié :** Déploiement depuis template
+** Point identifié :** Déploiement depuis template
 - **Resource Group** : Seul paramètre configurable lors du déploiement
 - Toutes autres configurations définies dans le template
 - Template = Infrastructure as Code
@@ -654,21 +654,21 @@ Root Management Group
 - **Validation** : Azure vérifie automatiquement la compatibilité des plages
 
 #### DNS Resolution
-**🎯 Point identifié :** DNS interne Azure
+** Point identifié :** DNS interne Azure
 - **Format automatique** : `vm-name.internal.cloudapp.net`
 - **Usage** : Résolution entre VMs dans VNet
 - **Custom DNS** : Possibilité d'utiliser ses propres serveurs
 
 #### User-Defined Routes (UDR)
-**🎯 Cas d'usage identifié :** Redirection de trafic vers appliances réseau
+** Cas d'usage identifié :** Redirection de trafic vers appliances réseau
 - **Objectif** : Forcer le trafic à passer par des appliances spécifiques (firewalls, appliances d'inspection)
 - **Mécanisme** : Azure crée automatiquement une table de routage pour chaque sous-réseau avec des routes système par défaut
 - **Override** : Les UDR permettent de remplacer certaines routes système Azure
 - **Application** : Le trafic sortant d'un sous-réseau suit les routes de la table de routage du sous-réseau
 
-**🎯 Erreur fréquente identifiée :** Confusion entre routes système et UDR
-- **❌ Erreur** : Essayer de modifier les routes système par défaut
-- **✅ Correct** : Créer des User-Defined Routes pour rediriger le trafic
+** Erreur fréquente identifiée :** Confusion entre routes système et UDR
+- ** Erreur** : Essayer de modifier les routes système par défaut
+- ** Correct** : Créer des User-Defined Routes pour rediriger le trafic
 - **Principe** : Les routes système sont gérées par Azure, les UDR permettent de surcharger le comportement
 
 ### 4.2 Network Security Groups (NSG)
@@ -679,7 +679,7 @@ Can be used with subnet or NIC
 - **Direction** : Inbound, Outbound
 - **Action** : Allow, Deny
 
-**🎯 Optimisation identifiée :**
+** Optimisation identifiée :**
 - **Un NSG peut être associé à plusieurs ressources**
 - **5 VMs avec mêmes règles = 5 NICs + 1 NSG**
 - Partage possible entre subnets et NICs
@@ -722,7 +722,7 @@ Can be used with subnet or NIC
 - **Public** : Trafic depuis Internet
 - **Features** : Health probes, NAT rules, HA ports
 
-**🎯 Tips critiques identifiés :**
+** Tips critiques identifiés :**
 
 **1. Session Persistence (Sticky Sessions) - Concept Clé**
 - **Problème résolu** : Maintenir l'utilisateur sur le même serveur backend
@@ -755,7 +755,7 @@ Can be used with subnet or NIC
 
 ### 4.4 Network Watcher
 
-**🎯 Points identifiés pour l'examen :**
+** Points identifiés pour l'examen :**
 
 #### Connection Monitor
 - **Usage** : Mesurer RTT entre VMs
@@ -763,7 +763,7 @@ Can be used with subnet or NIC
 - **Targets** : VM, FQDN, URI, IPv4
 - **Protocols** : TCP direct
 
-**🎯 Tips critiques identifiés :**
+** Tips critiques identifiés :**
 
 **1. Commandes de Diagnostic Spécialisées**
 - **`netstat -an`** : Diagnostic des ports d'écoute (essentiel pour troubleshooting)
@@ -784,7 +784,7 @@ Can be used with subnet or NIC
 - **Règle** : Diagnostic réseau = outils système, pas PowerShell Azure
 
 #### Traffic Analytics
-**🎯 Ressources requises identifiées :**
+** Ressources requises identifiées :**
 1. **Log Analytics Workspace** : Analyse et stockage
 2. **Storage Account** : Stockage NSG Flow Logs
 3. **NSG Flow Logs** : Source de données activée
@@ -804,15 +804,15 @@ Can be used with subnet or NIC
 - **Connection** : Lien entre les gateways
 - **Protocols** : IKEv1, IKEv2, SSTP
 
-**🎯 Cas d'usage identifié :** Connexions chiffrées on-premises
+** Cas d'usage identifié :** Connexions chiffrées on-premises
 - **Scénario** : Activer la connectivité VNet vers ressources on-premises avec connexion chiffrée
 - **Solution** : Configurer une Virtual Network Gateway (VPN Gateway)
 - **Mécanisme** : Envoie du trafic chiffré entre un réseau virtuel et un emplacement on-premises via connexion publique
 - **Configuration** : Dépend de plusieurs ressources avec paramètres configurables
 
-**🎯 Erreur fréquente identifiée :** Confusion entre Private Endpoints et VPN Gateways
-- **❌ Erreur** : Utiliser des Private Endpoints pour la connectivité on-premises
-- **✅ Correct** : Utiliser des Virtual Network Gateways pour les connexions chiffrées
+** Erreur fréquente identifiée :** Confusion entre Private Endpoints et VPN Gateways
+- ** Erreur** : Utiliser des Private Endpoints pour la connectivité on-premises
+- ** Correct** : Utiliser des Virtual Network Gateways pour les connexions chiffrées
 - **Différenciation** : Private Endpoints = Accès privé aux services Azure
 - **Usage** : VPN Gateways = Connexions chiffrées vers on-premises
 
@@ -841,7 +841,7 @@ Can be used with subnet or NIC
 
 #### Cost Management et Budgets
 
-**🎯 Configuration des budgets et actions automatiques :**
+** Configuration des budgets et actions automatiques :**
 
 **Processus d'édition de budget :**
 1. **Cost Management + Billing** → **Budgets**
@@ -849,13 +849,13 @@ Can be used with subnet or NIC
 3. **Créer un nouveau Action Group** de type **Runbook**
 4. **Choisir "Stop VM"** comme action
 
-**🎯 Points clés identifiés :**
+** Points clés identifiés :**
 - **Cost analysis** : Ne peut pas arrêter automatiquement les VMs
 - **Scale Up VM action group** : Non requis pour arrêter les VMs
 - **Runbook type** : Obligatoire pour actions d'automatisation
 - **Stop VM action** : Action spécifique pour arrêter les machines virtuelles
 
-**🎯 Azure Advisor - Cost Optimization :**
+** Azure Advisor - Cost Optimization :**
 - **Cost blade** : Optimisation et réduction des dépenses Azure
 - **Identification** : VMs sous-utilisées
 - **Performance blade** : Amélioration de la vitesse des applications
@@ -903,7 +903,7 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 
 #### Recovery Services Vault
 
-**🎯 Règles critiques identifiées :**
+** Règles critiques identifiées :**
 
 **Localisation :**
 - Vault et ressources **dans la même région**
@@ -917,7 +917,7 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 
 #### Backup Policies
 
-**🎯 Limites par type de ressource :**
+** Limites par type de ressource :**
 - **VMs** : Maximum 100 VMs par policy
 - **SQL Databases** : Policy séparée requise
 - **File Shares** : Policy séparée requise
@@ -961,33 +961,33 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 
 ---
 
-## 🎯 Tips Pratiques d'Examen - Insights des Questions Réelles
+## Tips Pratiques d'Examen - Insights des Questions Réelles
 
 ### 4.5 Pièges Fréquents et Solutions
 
 #### VNet Peering - Erreurs de Plages d'Adresses
-**🎯 Piège identifié :** Confusion entre plages chevauchantes et non-chevauchantes
+** Piège identifié :** Confusion entre plages chevauchantes et non-chevauchantes
 - **Erreur courante** : Essayer de peerer 192.168.0.0/24 avec 192.168.0.0/16
 - **Raison** : /24 est inclus dans /16 → chevauchement détecté par Azure
 - **Solution** : Utiliser des plages complètement différentes (10.x.x.x vs 172.x.x.x)
 - **Validation** : Azure bloque automatiquement les peerings avec chevauchement
 
 #### NSG - Priorités et Évaluation en Cascade
-**🎯 Piège identifié :** Oublier l'évaluation en cascade Subnet → NIC
+** Piège identifié :** Oublier l'évaluation en cascade Subnet → NIC
 - **Erreur courante** : NSG Subnet Allow + NSG NIC Deny = Trafic bloqué
 - **Raison** : Les deux niveaux doivent autoriser le trafic
 - **Solution** : Vérifier les NSG aux deux niveaux lors du troubleshooting
 - **Optimisation** : Un seul NSG Deny à n'importe quel niveau bloque tout
 
 #### Load Balancer - Session Persistence vs NAT Rules
-**🎯 Piège identifié :** Confusion entre session persistence et NAT rules
+** Piège identifié :** Confusion entre session persistence et NAT rules
 - **Erreur courante** : Utiliser NAT rules pour maintenir les sessions utilisateur
 - **Raison** : NAT rules = redirection de trafic, Session persistence = maintien de session
 - **Solution** : Client IP + Protocol pour les applications avec état
 - **Cas d'usage** : E-commerce, applications avec paniers, sessions utilisateur
 
 #### Diagnostic Réseau - Outils Spécialisés
-**🎯 Piège identifié :** Utiliser les mauvais outils pour le diagnostic
+** Piège identifié :** Utiliser les mauvais outils pour le diagnostic
 - **Erreur courante** : `Get-AzVirtualNetworkUsageList` pour diagnostic de ports
 - **Raison** : PowerShell Azure ≠ outils de diagnostic réseau
 - **Solution** : `netstat -an` pour ports d'écoute, `Test-NetConnection` pour connectivité
@@ -1005,61 +1005,61 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 
 ---
 
-## 🎯 Points Critiques Basés sur Vos Erreurs
+## Points Critiques Basés sur Vos Erreurs
 
 ### 1. Log Analytics = Hub Central pour Monitoring
-**❌ Erreur courante :** Choisir la VM comme target resource
-**✅ Correct :** Log Analytics Workspace pour toutes les alertes de logs
+** Erreur courante :** Choisir la VM comme target resource
+** Correct :** Log Analytics Workspace pour toutes les alertes de logs
 - Windows Event Logs → Log Analytics
 - Linux Syslog → Log Analytics
 - VM metrics → VM directement
 
 ### 2. Règle de Même Région
-**❌ Erreur :** Vault et Storage dans régions différentes
-**✅ Correct :** Toujours même région pour :
+** Erreur :** Vault et Storage dans régions différentes
+** Correct :** Toujours même région pour :
 - Recovery Services Vault + Storage Account
 - Traffic Analytics components
 - Backup sources et destinations
 
 ### 3. Disque D: = Temporaire et Volatil
-**❌ Erreur :** Stocker des données importantes sur D:
-**✅ Correct :** D: pour cache/temp uniquement
+** Erreur :** Stocker des données importantes sur D:
+** Correct :** D: pour cache/temp uniquement
 - C: = Persistant (OS, apps)
 - D: = Temporaire (perdu lors maintenance)
 - E:, F: = Persistants (données)
 
 ### 4. Storage Account Types et Limitations
-**❌ Erreur :** Premium File Shares sur StorageV2
-**✅ Correct :** FileStorage accounts uniquement
+** Erreur :** Premium File Shares sur StorageV2
+** Correct :** FileStorage accounts uniquement
 - StorageV2 = Standard files uniquement
 - BlobStorage = Pas de files du tout
 
 ### 5. NSG Sharing et Optimisation
-**❌ Erreur :** Un NSG par VM
-**✅ Correct :** Un NSG partagé si mêmes règles
+** Erreur :** Un NSG par VM
+** Correct :** Un NSG partagé si mêmes règles
 - 5 VMs = 5 NICs + 1 NSG (optimal)
 
 ### 6. Recovery Services Vault Management
-**❌ Erreur :** Essayer supprimer vault avec backups actifs
-**✅ Correct :** Toujours arrêter backups d'abord
+** Erreur :** Essayer supprimer vault avec backups actifs
+** Correct :** Toujours arrêter backups d'abord
 - Stop backup → Delete vault
 - Change vault = Stop + Start elsewhere
 
 ### 7. App Service Deployment Workflow
-**❌ Erreur :** Deploy direct en production
-**✅ Correct :** Deploy → Test → Swap
+** Erreur :** Deploy direct en production
+** Correct :** Deploy → Test → Swap
 - Staging slot pour tests
 - Production swap pour zero downtime
 
 ### 8. Root Management Group Access
-**❌ Erreur :** Accès direct au root MG
-**✅ Correct :** Global Admin + elevation required
+** Erreur :** Accès direct au root MG
+** Correct :** Global Admin + elevation required
 - Aucun accès par défaut
 - Global Admin doit s'élever
 
 ---
 
-## ✅ Checklist Final d'Examen
+## Checklist Final d'Examen
 
 ### Identities and Governance
 - [ ] Dynamic group rules syntax : `(user.property -eq "value")`
@@ -1098,7 +1098,7 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 
 ---
 
-## 📚 Ressources d'Étude Recommandées
+##  Ressources d'Étude Recommandées
 
 ### Documentation Microsoft
 - Azure Architecture Center
