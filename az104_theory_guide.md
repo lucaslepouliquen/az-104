@@ -355,9 +355,59 @@ Root Management Group
 ### 2.3 Blob Storage
 
 #### Types de Blobs
-- **Block Blobs** : Fichiers standard (documents, images, vidéos)
-- **Page Blobs** : Disques de machines virtuelles
-- **Append Blobs** : Logs, données ajoutées séquentiellement
+
+** Comprendre les 3 types de blobs Azure - Points critiques pour l'examen :**
+
+**1. Block Blobs**
+- **Usage principal** : Stockage de fichiers standard (documents, images, vidéos, archives)
+- **Structure** : Composés de blocs individuels (jusqu'à 50,000 blocs par blob)
+- **Taille maximale** : 190.7 TB (4.75 TB × 50,000 blocs)
+- **Taille de bloc** : Jusqu'à 4000 MB par bloc
+- **Optimisation** : Idéal pour streaming et accès aléatoire
+- **Cas d'usage typiques** :
+  - Sites web statiques (HTML, CSS, JS, images)
+  - Stockage de documents et médias
+  - Sauvegardes et archives
+  - Distribution de contenu (CDN)
+
+**2. Page Blobs**
+- **Usage principal** : Disques de machines virtuelles Azure (VHD/VHDX)
+- **Structure** : Pages de 512 octets, accès aléatoire optimisé
+- **Taille maximale** : 8 TB par page blob
+- **Performance** : Optimisé pour opérations de lecture/écriture aléatoires fréquentes
+- **Cas d'usage typiques** :
+  - Disques OS et disques de données des VMs
+  - Bases de données nécessitant accès aléatoire
+  - Applications nécessitant des performances I/O élevées
+- ** Point clé** : Seul type de blob supportant les disques de VMs
+
+**3. Append Blobs**
+- **Usage principal** : Données ajoutées séquentiellement (logs, audit trails)
+- **Structure** : Optimisé pour opérations d'ajout uniquement
+- **Taille maximale** : 195 GB par append blob
+- **Limitation** : Pas de modification des données existantes, ajout uniquement
+- **Cas d'usage typiques** :
+  - Fichiers de logs d'applications
+  - Journaux d'audit et de sécurité
+  - Streaming de données en temps réel
+  - Données IoT collectées en continu
+
+** Matrice de décision rapide :**
+
+| Besoin | Type de Blob | Raison |
+|--------|--------------|--------|
+| Stocker des images/vidéos | **Block Blob** | Accès aléatoire, streaming optimisé |
+| Disque de VM | **Page Blob** | Seul type supporté pour VHD |
+| Logs d'application | **Append Blob** | Ajout séquentiel optimisé |
+| Site web statique | **Block Blob** | Hébergement web, CDN |
+| Base de données | **Page Blob** | Accès aléatoire haute performance |
+| Données IoT | **Append Blob** | Collecte continue, ajout uniquement |
+
+** Erreurs fréquentes identifiées :**
+- ** Erreur** : Utiliser Append Blobs pour des fichiers modifiables
+- ** Correct** : Block Blobs pour fichiers modifiables, Append Blobs pour ajout uniquement
+- ** Erreur** : Essayer d'utiliser Block Blobs pour disques de VMs
+- ** Correct** : Page Blobs obligatoires pour tous les disques de VMs
 
 #### Lifecycle Management
 - **Règles automatiques** : Transition entre niveaux
