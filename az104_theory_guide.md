@@ -35,7 +35,7 @@
 - **Dynamic User** : Règles basées sur les attributs utilisateur
 - **Dynamic Device** : Règles basées sur les attributs d'appareil
 
-**🎯 Erreur fréquente identifiée :** Syntaxe des règles dynamiques
+** Erreur fréquente identifiée :** Syntaxe des règles dynamiques
 ```
 // Correct
 (user.department -eq "Marketing") and (user.country -eq "France")
@@ -51,20 +51,20 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 2. Créer un enregistrement DNS pour vérification
 3. Vérifier la propriété du domaine
 
-**🎯 Point d'attention identifié :** Types d'enregistrements DNS acceptés
+** Point d'attention identifié :** Types d'enregistrements DNS acceptés
 - **TXT** : Méthode recommandée (plus flexible)
 - **MX** : Alternative acceptable
 - Exemple : `MS=ms12345678` dans un enregistrement TXT
 
 #### Licensing et Dynamic Groups
 
-**🎯 Processus d'assignation automatique de licences :**
+** Processus d'assignation automatique de licences :**
 1. **Créer un groupe de sécurité dynamique** basé sur des attributs personnalisés
 2. **Configurer les règles** du groupe dynamique
 3. **Ajouter le groupe à un groupe de licences** pour synchronisation automatique
 4. **Tous les utilisateurs** du groupe reçoivent automatiquement la licence
 
-**🎯 Points clés identifiés :**
+** Points clés identifiés :**
 - **Dynamic security groups** : Obligatoires pour assignation automatique
 - **Custom attributes** : Base des règles de groupe
 - **License groups** : Synchronisation automatique requise
@@ -72,19 +72,19 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 
 #### B2B Collaboration
 
-**🎯 Configuration des paramètres de collaboration externe :**
+** Configuration des paramètres de collaboration externe :**
 - **External collaboration settings** : Contrôlent qui peut inviter des utilisateurs externes
 - **Domain restrictions** : Autoriser/bloquer des domaines spécifiques
 - **Guest user visibility** : Contrôler ce que voient les invités dans l'annuaire
 - **Conditional Access** : Renforcer l'authentification et bloquer l'accès depuis des emplacements inconnus
 - **Cross-tenant access** : Configuration de collaboration avec des organisations Microsoft Entra spécifiques
 
-**🎯 Format UPN des utilisateurs invités :**
+** Format UPN des utilisateurs invités :**
 - **Guest users** : `bsmith_contoso.com#EXT#@fabrikam.com`
 - **Regular users** : `user@fabrikam.com`
 - **Access reviews** : Non utilisées pour contrôler les invitations d'invités
 
-**🎯 Prérequis pour assignation de licences :**
+** Prérequis pour assignation de licences :**
 - **Usage location** : Obligatoire avant assignation de licence
 - **Not all Microsoft 365 services** disponibles dans tous les emplacements
 - **First name, Last name, Other email, User type** : Non obligatoires pour assignation de licence
@@ -102,7 +102,7 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **Storage Account Contributor** : Gestion des comptes de stockage
 - **Network Contributor** : Gestion des ressources réseau
 
-**🎯 Différenciation des rôles essentiels :**
+** Différenciation des rôles essentiels :**
 
 **Contributor**
 - **Création et gestion** : Tous types de ressources
@@ -130,7 +130,7 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 3. **Resource Group** : Toutes les ressources du groupe
 4. **Resource** : Ressource spécifique
 
-**🎯 Erreur identifiée :** Root Management Group
+** Erreur identifiée :** Root Management Group
 - **Aucun accès par défaut** au root management group
 - Seuls les **Global Administrators** peuvent s'élever
 - Process : Global Admin → "Access management for Azure resources" → Assign roles
@@ -175,7 +175,7 @@ Root Management Group
 
 #### Resource Locks
 
-**🎯 Types de verrous et limitations :**
+** Types de verrous et limitations :**
 
 **Delete Locks**
 - **Protection** : Bloque la suppression de ressources
@@ -183,7 +183,7 @@ Root Management Group
 - **Ressources non supportées** : Management groups, storage account data
 - **Usage** : Protection contre suppression accidentelle
 
-**🎯 Points clés identifiés :**
+** Points clés identifiés :**
 - **Delete locks** : Empêchent la suppression mais pas la modification
 - **Management groups** : Ne peuvent pas être verrouillés
 - **Storage account data** : Données non protégées par les locks
@@ -299,7 +299,7 @@ Root Management Group
 
 #### Réplication et Durabilité
 
-**🎯 Points d'attention identifiés :**
+** Points d'attention identifiés :**
 
 **Local Redundant Storage (LRS)**
 - 3 copies dans le même datacenter
@@ -338,7 +338,7 @@ Root Management Group
 - **NFS 4.1** : Linux, Premium uniquement
 - **REST API** : Accès programmatique
 
-**🎯 Point clé identifié :** Port SMB
+** Point clé identifié :** Port SMB
 - **Port 445 TCP** obligatoire pour accès SMB
 - Doit être ouvert sur les firewalls clients
 - Nécessaire pour mapper des lecteurs réseau
