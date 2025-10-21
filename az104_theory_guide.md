@@ -748,6 +748,186 @@ Can be used with subnet or NIC
 - **URL routing** : Routage basé sur l'URL
 - **Multi-site hosting** : Plusieurs sites web
 
+#### Comparaison Détaillée : Azure Load Balancer vs Application Gateway
+
+**🎯 Différences Critiques pour l'Examen AZ-104**
+
+**1. Couche OSI et Protocoles**
+
+**Azure Load Balancer (Layer 4 - Transport)**
+- **Protocoles supportés** : TCP, UDP uniquement
+- **Fonctionnement** : Distribution basée sur IP source/destination + port
+- **Visibilité** : Ne peut pas voir le contenu des paquets
+- **Usage** : Load balancing basique, NAT, HA ports
+- **Performance** : Très haute (pas d'inspection de contenu)
+
+**Application Gateway (Layer 7 - Application)**
+- **Protocoles supportés** : HTTP, HTTPS uniquement
+- **Fonctionnement** : Inspection du contenu HTTP/HTTPS
+- **Visibilité** : Peut analyser headers, URLs, cookies, body
+- **Usage** : Routage intelligent, WAF, SSL termination
+- **Performance** : Plus élevée latence (inspection de contenu)
+
+**2. Fonctionnalités et Capacités**
+
+**Azure Load Balancer - Fonctionnalités Clés**
+- **Health Probes** : TCP, HTTP, HTTPS
+- **Session Persistence** : Client IP, Client IP + Protocol, None
+- **NAT Rules** : Port forwarding, inbound/outbound
+- **HA Ports** : Load balancing sur tous les ports
+- **Backend Pools** : VMs, VMSS, IP addresses
+- **Distribution Methods** : 5-tuple hash, 3-tuple hash, Source IP
+
+**Application Gateway - Fonctionnalités Clés**
+- **URL-based Routing** : Routage basé sur le chemin URL
+- **Host-based Routing** : Routage basé sur le header Host
+- **Path-based Routing** : Routage basé sur le chemin de l'URL
+- **Multi-site Hosting** : Plusieurs domaines sur même gateway
+- **SSL Termination** : Décryptage SSL côté gateway
+- **WAF Integration** : Protection contre OWASP Top 10
+- **Cookie-based Affinity** : Session persistence basée sur cookies
+
+**3. Cas d'Usage et Scénarios**
+
+**Utiliser Azure Load Balancer quand :**
+- **Applications non-HTTP** : Bases de données, services TCP/UDP
+- **Performance maximale** : Latence minimale requise
+- **Simplicité** : Load balancing basique sans inspection
+- **Coût** : Solution la moins chère
+- **Backend hétérogène** : Mélange de services différents
+
+**Utiliser Application Gateway quand :**
+- **Applications web** : Sites web, APIs REST
+- **Routage intelligent** : Besoin de router selon URL/host
+- **Sécurité web** : Protection contre attaques web
+- **SSL centralisé** : Gestion centralisée des certificats
+- **Multi-tenant** : Plusieurs sites sur même infrastructure
+
+**4. Architecture et Déploiement**
+
+**Azure Load Balancer**
+- **Types** : Public, Internal
+- **SKUs** : Basic, Standard
+- **Backend** : VMs, VMSS, IP addresses
+- **Frontend** : Public IP ou Private IP
+- **Zones** : Standard SKU supporte Availability Zones
+
+**Application Gateway**
+- **Types** : v1, v2 (WAF v2)
+- **SKUs** : Standard, WAF, Standard_v2, WAF_v2
+- **Backend** : VMs, VMSS, App Services, IP addresses
+- **Frontend** : Public IP uniquement
+- **Zones** : v2 SKU supporte Availability Zones
+
+**5. Configuration et Gestion**
+
+**Azure Load Balancer - Configuration Type**
+```json
+{
+  "loadBalancingRules": [
+    {
+      "name": "LBRule",
+      "protocol": "Tcp",
+      "frontendPort": 80,
+      "backendPort": 80,
+      "enableFloatingIP": false
+    }
+  ],
+  "probes": [
+    {
+      "name": "HTTPProbe",
+      "protocol": "Http",
+      "port": 80,
+      "path": "/health"
+    }
+  ]
+}
+```
+
+**Application Gateway - Configuration Type**
+```json
+{
+  "routingRules": [
+    {
+      "name": "Rule1",
+      "ruleType": "Basic",
+      "httpListener": "Listener1",
+      "backendAddressPool": "Pool1",
+      "backendHttpSettings": "Settings1"
+    }
+  ],
+  "httpListeners": [
+    {
+      "name": "Listener1",
+      "frontendPort": "Port1",
+      "protocol": "Http"
+    }
+  ]
+}
+```
+
+**6. Coûts et Facturation**
+
+**Azure Load Balancer**
+- **Basic** : Gratuit (limitations)
+- **Standard** : ~$18/mois + trafic sortant
+- **Facturation** : Par règle + trafic
+
+**Application Gateway**
+- **v1** : ~$18/mois + capacité
+- **v2** : Pay-per-use + capacité
+- **WAF** : Coût supplémentaire
+- **Facturation** : Par heure + capacité + données
+
+**7. Limitations et Contraintes**
+
+**Azure Load Balancer**
+- **Basic SKU** : Pas de HA ports, pas de zones
+- **Backend** : Maximum 1000 instances
+- **Rules** : Maximum 150 rules
+- **Probes** : Maximum 5 probes
+
+**Application Gateway**
+- **Backend** : Maximum 100 instances
+- **Rules** : Maximum 100 rules
+- **Listeners** : Maximum 40 listeners
+- **Certificates** : Maximum 20 certificates
+
+**8. Matrice de Décision Rapide**
+
+| Critère | Azure Load Balancer | Application Gateway |
+|---------|-------------------|-------------------|
+| **Protocole** | TCP/UDP | HTTP/HTTPS |
+| **Couche** | Layer 4 | Layer 7 |
+| **Performance** | Très haute | Haute |
+| **Coût** | Faible | Élevé |
+| **Sécurité** | Basique | Avancée (WAF) |
+| **Routage** | Basique | Intelligent |
+| **SSL** | Pas de gestion | Termination |
+| **Monitoring** | Métriques de base | Métriques avancées |
+
+**9. Scénarios d'Examen Courants**
+
+**Scénario 1 : Application Web avec Routage**
+- **Besoin** : Router `/api` vers backend API, `/app` vers frontend
+- **Solution** : Application Gateway avec path-based routing
+- **Raison** : Load Balancer ne peut pas router selon URL
+
+**Scénario 2 : Base de Données avec HA**
+- **Besoin** : Load balancing pour SQL Server
+- **Solution** : Azure Load Balancer
+- **Raison** : Application Gateway ne supporte que HTTP/HTTPS
+
+**Scénario 3 : Sécurité Web**
+- **Besoin** : Protection contre attaques OWASP
+- **Solution** : Application Gateway avec WAF
+- **Raison** : Load Balancer n'a pas de fonctionnalités de sécurité web
+
+**Scénario 4 : Performance Maximale**
+- **Besoin** : Latence minimale pour application critique
+- **Solution** : Azure Load Balancer
+- **Raison** : Pas d'inspection de contenu = latence minimale
+
 #### Traffic Manager (DNS-based)
 - **Global** : Répartition géographique
 - **Methods** : Performance, Geographic, Weighted, Priority
