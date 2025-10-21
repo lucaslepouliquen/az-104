@@ -195,25 +195,28 @@ Root Management Group
 
 ### 2.1 Storage Accounts
 
-#### Types de Storage Accounts
+#### Types de Storage Accounts (Mise à jour 2024)
 
 **General Purpose v2 (GPv2) - Standard**
 - **Services** : Blobs, Files, Queues, Tables
-- **Performance** : Standard (HDD)
+- **Performance** : Standard (HDD) ou Premium (SSD) selon le service
 - **Réplication** : Toutes les options (LRS, ZRS, GRS, GZRS, RA-GRS, RA-GZRS)
 - **Usage** : Polyvalent, recommandé pour la plupart des cas
+- **Nouveauté 2024** : Support des Premium File Shares (SSD) sur GPv2
 
-**Premium Block Blobs**
-- **Services** : Blobs uniquement
-- **Performance** : Premium (SSD)
+**Premium Block Blobs (BlobStorage)**
+- **Services** : Blobs uniquement (Block, Page, Append)
+- **Performance** : Premium (SSD) uniquement
 - **Réplication** : LRS, ZRS uniquement
-- **Usage** : Applications haute performance
+- **Usage** : Applications haute performance, bases de données
+- **Avantage** : IOPS élevées, latence faible
 
-**Premium File Shares**
+**Premium File Shares (FileStorage)**
 - **Services** : Files uniquement
-- **Performance** : Premium (SSD)
+- **Performance** : Premium (SSD) uniquement
 - **Réplication** : LRS, ZRS uniquement
 - **Usage** : Partages de fichiers haute performance
+- **Nouveauté 2024** : Support NFS 4.1 avec chiffrement en transit
 
 **Erreur fréquente identifiée :** Confusion entre types de Storage Accounts pour Azure Files
 
@@ -331,26 +334,46 @@ Root Management Group
 - Comme GZRS + accès lecture sur région secondaire
 - Combinaison de haute disponibilité et résilience géographique
 
-### 2.2 Azure Files
+### 2.2 Azure Files (Mise à jour 2024)
 
 #### Protocoles Supportés
 - **SMB 3.0/3.1** : Windows, Linux, macOS
 - **NFS 4.1** : Linux, Premium uniquement
 - **REST API** : Accès programmatique
+- **Nouveauté 2024** : Chiffrement en transit pour NFS 4.1
 
 ** Point clé identifié :** Port SMB
 - **Port 445 TCP** obligatoire pour accès SMB
 - Doit être ouvert sur les firewalls clients
 - Nécessaire pour mapper des lecteurs réseau
 
-#### Types de File Shares
-- **Standard** : StorageV2 accounts, performance modérée
-- **Premium** : FileStorage accounts, haute performance (SSD)
+#### Types de File Shares (Mise à jour 2024)
 
-#### Capacités et Limites
+**Standard File Shares**
+- **Comptes** : General Purpose v2 (GPv2)
+- **Performance** : Standard (HDD)
+- **Capacité** : Jusqu'à 5 TB par share
+- **Usage** : Applications générales, partages basiques
+
+**Premium File Shares (SSD)**
+- **Comptes** : General Purpose v2 (GPv2) ou FileStorage
+- **Performance** : Premium (SSD)
+- **Capacité** : Jusqu'à 100 TB par share (Standard) ou 256 TiB (v2 approvisionné)
+- **Usage** : Applications haute performance, bases de données
+- **Nouveauté 2024** : Modèle v2 approvisionné avec prévisibilité des coûts
+
+**Nouveautés 2024 - Fonctionnalités Avancées**
+- **Chiffrement en transit NFS** : Sécurité renforcée pour partages NFS 4.1
+- **Mise en cache des métadonnées** : Réduction de latence, augmentation IOPS
+- **Identités managées** : Authentification sécurisée sans clés partagées
+- **Sauvegarde archivée** : Protection contre ransomwares, rétention jusqu'à 10 ans
+- **Azure File Sync via Azure Arc** : Gestion simplifiée des agents de synchronisation
+
+#### Capacités et Limites (Mise à jour 2024)
 - **Standard** : Maximum 5 TB par share
-- **Premium** : Maximum 100 TB par share
+- **Premium** : Maximum 100 TB par share (Standard) ou 256 TiB (v2 approvisionné)
 - **Azure Import/Export** : Support Blob Storage et Azure Files
+- **Nouveauté** : Support des identités managées pour Azure File Sync
 
 ### 2.3 Blob Storage
 
@@ -358,17 +381,23 @@ Root Management Group
 
 ** Comprendre les 3 types de blobs Azure - Points critiques pour l'examen :**
                                          
-**1. Block Blobs**
+**1. Block Blobs (Mise à jour 2024)**
 - **Usage principal** : Stockage de fichiers standard (documents, images, vidéos, archives)
 - **Structure** : Composés de blocs individuels (jusqu'à 50,000 blocs par blob)
-- **Taille maximale** : 190.7 TB (4.75 TB × 50,000 blocs)
-- **Taille de bloc** : Jusqu'à 4000 MB par bloc
+- **Taille maximale** : 190.7 TiB (depuis version service 2019-12-12)
+- **Taille de bloc** : Jusqu'à 4000 MiB par bloc (environ 4.19 GB)
+- **Calcul** : 4000 MiB × 50,000 blocs = ~190.7 TiB
 - **Optimisation** : Idéal pour streaming et accès aléatoire
+- **Nouveautés 2024** : 
+  - Support TLS 1.3 pour sécurité renforcée
+  - Azure Storage Actions pour automatisation
+  - Microsoft Defender pour Storage intégré
 - **Cas d'usage typiques** :
   - Sites web statiques (HTML, CSS, JS, images)
   - Stockage de documents et médias
   - Sauvegardes et archives
   - Distribution de contenu (CDN)
+- **Note importante** : Les limites dépendent de la version du service Azure utilisée
 
 **2. Page Blobs**
 - **Usage principal** : Disques de machines virtuelles Azure (VHD/VHDX)
@@ -414,7 +443,7 @@ Root Management Group
 - **Suppression automatique** : Basée sur l'âge
 - **Conditions** : Dernière modification, dernière accès, création
 
-### 2.4 Data Transfer Solutions
+### 2.4 Data Transfer Solutions (Mise à jour 2024)
 
 #### Azure Import/Export Service
 ** Destinations supportées identifiées :**
@@ -428,12 +457,33 @@ Root Management Group
 3. Expédier vers datacenter Azure
 4. Azure transfert les données
 
-#### Other Transfer Options
-- **AzCopy** : Outil ligne de commande
-- **Azure Storage Explorer** : Interface graphique
-- **Data Box** : Appliances physiques (TB vers PB)
+#### Outils de Transfert (Mise à jour 2024)
 
-#### Storage Account Roles et Permissions
+**AzCopy v10+ (Recommandé)**
+- **Fonctionnalités** : Transfert haute performance, résilience
+- **Support** : Blob, Files, Tables, Queues
+- **Nouveautés 2024** : Support des identités managées, chiffrement en transit
+- **Usage** : Scripts automatisés, migrations à grande échelle
+
+**Azure Storage Explorer**
+- **Interface** : Graphique intuitive
+- **Fonctionnalités** : Gestion complète des comptes de stockage
+- **Nouveautés 2024** : Support des identités managées, Azure AD B2B
+- **Usage** : Administration manuelle, exploration des données
+
+**Azure Data Box Family**
+- **Data Box** : 40 TB - 80 TB (disques)
+- **Data Box Heavy** : 1 PB (appliance)
+- **Data Box Edge** : Computing edge + transfert
+- **Nouveautés 2024** : Support des identités managées, chiffrement renforcé
+
+**Azure Storage Actions (Nouveauté 2024)**
+- **Fonctionnalité** : Automatisation de la gestion des données
+- **Support** : Blob Storage, Data Lake Storage
+- **Usage** : Workflows automatisés, transformations de données
+- **Avantage** : Plateforme entièrement gérée pour l'automatisation
+
+#### Storage Account Roles et Permissions (Mise à jour 2024)
 
 ** Rôles de gestion des comptes de stockage :**
 
@@ -463,6 +513,32 @@ Root Management Group
 - **Storage Blob Data Contributor** : Accès aux données uniquement
 - **Reader** : Visualisation sans modification
 - **Owner** : Contrôle total + délégation d'accès
+
+#### Sécurité et Conformité (Nouveautés 2024)
+
+**Microsoft Defender pour Storage**
+- **Protection** : Détection des menaces en temps réel
+- **Alertes** : Activités suspectes, accès anormaux
+- **Intégration** : Azure Security Center, Log Analytics
+- **Usage** : Sécurité proactive des données de stockage
+
+**Chiffrement et Sécurité Renforcée**
+- **TLS 1.3** : Support pour Blob Storage (sécurité renforcée)
+- **Chiffrement en transit NFS** : Protection des partages NFS 4.1
+- **Clés gérées par le client** : Contrôle total du chiffrement
+- **Identités managées** : Authentification sans clés partagées
+
+**Conformité et Gouvernance**
+- **Frontière européenne des données** : Contrôle de l'emplacement des données
+- **Politiques Purview** : Classification et protection des données
+- **Audit et monitoring** : Traçabilité complète des accès
+- **RGPD compliance** : Conformité réglementaire européenne
+
+**Nouveautés Sécurité 2024**
+- **Azure Storage Actions** : Automatisation sécurisée des workflows
+- **Sauvegarde archivée** : Protection contre ransomwares (10 ans de rétention)
+- **Azure File Sync sécurisé** : Synchronisation avec identités managées
+- **Monitoring avancé** : Métriques de sécurité et alertes intelligentes
 
 ---
 
