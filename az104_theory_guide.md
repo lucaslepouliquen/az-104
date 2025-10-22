@@ -97,6 +97,37 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **Reader** : Lecture seule
 - **User Access Administrator** : Gestion des accès uniquement
 
+#### Rôles Administratifs Azure AD
+
+**User Administrator**
+- **Permissions** : Création et gestion des utilisateurs et groupes
+- **Capacités** : Gestion des tickets de support, monitoring de la santé des services
+- **Usage** : Administration dédiée aux utilisateurs sans privilèges excessifs
+- **Scope** : Gestion des identités uniquement
+
+**Global Administrator**
+- **Permissions** : Accès complet à toutes les fonctionnalités Azure AD
+- **Capacités** : Plus de permissions que nécessaire pour la gestion basique
+- **Usage** : Administration complète du tenant
+- **Principe** : Utiliser le rôle le moins privilégié possible
+
+**Billing Administrator**
+- **Permissions** : Gestion des aspects financiers et de facturation
+- **Capacités** : Achats, abonnements, gestion des coûts
+- **Usage** : Administration financière
+- **Scope** : Facturation et finances uniquement
+
+**Service Administrator**
+- **Type** : Rôle classique (Classic)
+- **Permissions** : Accès complet aux services Azure
+- **Usage** : Rôle legacy, non requis pour gestion utilisateurs
+- **Note** : Remplacé par les rôles RBAC modernes
+
+** Point clé identifié :** Principe du moindre privilège
+- **User Administrator** : Suffisant pour gestion utilisateurs et groupes
+- **Global Administrator** : Trop de permissions pour tâches simples
+- **Règle** : Toujours utiliser le rôle avec le minimum de permissions requis
+
 #### Rôles Spécialisés
 - **Virtual Machine Contributor** : Gestion des VMs
 - **Storage Account Contributor** : Gestion des comptes de stockage
@@ -730,10 +761,69 @@ Root Management Group
 - **Validation** : Azure vérifie automatiquement la compatibilité des plages
 
 #### DNS Resolution
+
 ** Point identifié :** DNS interne Azure
 - **Format automatique** : `vm-name.internal.cloudapp.net`
 - **Usage** : Résolution entre VMs dans VNet
 - **Custom DNS** : Possibilité d'utiliser ses propres serveurs
+
+### 4.1.1 Azure Private DNS Zones
+
+#### Concepts et Fonctionnalités
+
+**Azure Private DNS Zone**
+- **Usage** : Résolution DNS privée pour ressources Azure dans un VNet
+- **Avantages** : 
+  - Noms personnalisés pour ressources internes
+  - Résolution entre VNets connectés
+  - Pas besoin de serveurs DNS personnalisés
+- **Domaines** : Domaines personnalisés (ex: contoso.internal)
+
+#### Virtual Network Links
+
+**Processus d'association identifié :**
+Pour associer un VNet à une Private DNS Zone, vous devez :
+1. **Créer un Virtual Network Link** dans la zone DNS privée
+2. **Sélectionner le VNet** à associer
+3. **Configurer l'auto-registration** (optionnel)
+4. **Valider** l'association
+
+**Caractéristiques des Virtual Network Links :**
+- **Fonction** : Lie un VNet à une zone DNS privée
+- **Résolution** : Les VMs du VNet peuvent résoudre les enregistrements de la zone
+- **Auto-registration** : Enregistrement automatique des VMs dans la zone DNS
+- **Bi-directionnel** : Un VNet peut être lié à plusieurs zones DNS
+
+#### Azure DNS Private Resolver
+
+**Rôle et Utilisation :**
+- **Fonction principale** : Proxy pour requêtes DNS entre environnements on-premises et Azure DNS
+- **Scénario** : Connectivité hybride (on-premises <--> Azure)
+- **Avantages** :
+  - Résolution DNS bidirectionnelle
+  - Intégration transparente avec Private DNS Zones
+  - Pas de gestion de serveurs DNS
+- **Architecture** : Service géré déployé dans un VNet
+
+**Comparaison des Solutions DNS :**
+
+**Virtual Network Link (Recommandé pour Azure-only)**
+- **Usage** : Association VNet --> Private DNS Zone
+- **Scope** : Azure uniquement
+- **Configuration** : Simple, intégré
+- **Coût** : Inclus avec Private DNS
+
+**Azure DNS Private Resolver (Hybride)**
+- **Usage** : Proxy DNS on-premises <--> Azure
+- **Scope** : Environnements hybrides
+- **Configuration** : Déploiement dans VNet requis
+- **Coût** : Service facturé séparément
+
+**Custom DNS Server (Non recommandé pour Private DNS)**
+- **Usage** : Serveurs DNS personnalisés (VM ou appliance)
+- **Limitation** : Configuration complexe, ne fonctionne pas nativement avec Private DNS Zones
+- **Maintenance** : Gestion manuelle requise
+- **Coût** : Infrastructure + maintenance
 
 #### User-Defined Routes (UDR)
 ** Cas d'usage identifié :** Redirection de trafic vers appliances réseau
@@ -797,6 +887,48 @@ Can be used with subnet or NIC
 - **Internal** : Trafic interne au VNet
 - **Public** : Trafic depuis Internet
 - **Features** : Health probes, NAT rules, HA ports
+
+#### Troubleshooting Load Balancer - Standard SKU
+
+**Problèmes de connectivité courants et résolutions :**
+
+**1. Health Probe Configuration (Priorité haute)**
+- **Symptôme** : VMs ne reçoivent pas de trafic
+- **Cause** : Health probes mal configurés ou VMs ne répondent pas
+- **Solution** : 
+  - Vérifier la configuration des health probes (protocole, port, chemin)
+  - S'assurer que les VMs répondent sur le port configuré
+  - Tester manuellement le endpoint de health check
+- **Impact** : Si les probes échouent, le Load Balancer n'envoie pas de trafic
+
+**2. Port Response Verification (Priorité haute)**
+- **Symptôme** : Trafic n'atteint pas les backends
+- **Cause** : Application non démarrée ou port non écouté
+- **Solution** :
+  - Vérifier que l'application écoute sur le port configuré
+  - Utiliser `netstat -an` pour confirmer les ports d'écoute
+  - Redémarrer les services si nécessaire
+- **Impact** : Health probes échouent si le port ne répond pas
+
+**3. NSG Rules Validation (Priorité haute)**
+- **Symptôme** : Connectivité bloquée malgré Load Balancer configuré
+- **Cause** : NSG bloque le trafic inbound vers les VMs
+- **Solution** :
+  - Vérifier les règles NSG au niveau subnet ET NIC
+  - S'assurer que les règles autorisent le trafic sur les ports requis
+  - Autoriser le trafic depuis AzureLoadBalancer service tag
+- **Impact** : NSG peut bloquer même si Load Balancer est correct
+
+**Actions NON recommandées (Erreurs courantes) :**
+- **Modifier session persistence** : Ne résout pas les problèmes de connectivité de base
+- **Augmenter timeout settings** : N'aide pas si le trafic est bloqué
+- **Redémarrer les VMs** : Peut masquer temporairement sans résoudre la cause
+
+** Stratégie de troubleshooting identifiée :**
+1. **Health probes** : Vérifier configuration et réponses
+2. **Port listening** : Confirmer que les applications écoutent
+3. **NSG rules** : Valider les autorisations de trafic
+4. **Network Watcher** : Utiliser IP Flow Verify pour diagnostic approfondi
 
 ** Tips critiques identifiés :**
 
@@ -1011,6 +1143,13 @@ Can be used with subnet or NIC
 
 ### 4.4 Network Watcher
 
+#### Vue d'ensemble et Outils
+**Azure Network Watcher** est un service central de monitoring réseau qui fournit des outils pour :
+- **Monitoring** : Surveillance continue des ressources réseau
+- **Diagnostics** : Identification et résolution de problèmes de connectivité
+- **Métriques** : Visualisation des performances réseau
+- **Logging** : Activation/désactivation des logs pour ressources Azure VNet
+
 ** Points identifiés pour l'examen :**
 
 #### Connection Monitor
@@ -1018,6 +1157,38 @@ Can be used with subnet or NIC
 - **Granularity** : Métriques par minute
 - **Targets** : VM, FQDN, URI, IPv4
 - **Protocols** : TCP direct
+
+#### IP Flow Verify - Outil de Diagnostic NSG
+
+**Fonctionnalités principales :**
+- **Spécification complète** : Source/destination IPv4, port, protocole (TCP/UDP), direction (inbound/outbound)
+- **Identification précise** : Identifie le NSG spécifique qui bloque la communication
+- **Cas d'usage** : Troubleshooting rapide des problèmes de connectivité
+
+**Comparaison avec autres outils Network Watcher :**
+
+**IP Flow Verify (Recommandé)**
+- **Avantage** : Identification directe du NSG bloquant
+- **Configuration** : Minimale, test immédiat
+- **Résultat** : Règle NSG exacte responsable du blocage
+- **Usage** : Diagnostic rapide et précis
+
+**NSG Flow Logs**
+- **Fonction** : Logging du trafic IP à travers les NSG
+- **Limitation** : Configuration complexe + analyse manuelle
+- **Usage** : Analyse approfondie du trafic sur le long terme
+- **Différence** : Ne pointe pas directement le NSG problématique
+
+**Packet Capture**
+- **Fonction** : Capture du trafic réseau détaillé
+- **Limitation** : Réduit le scope mais n'identifie pas le NSG
+- **Usage** : Analyse détaillée des paquets réseau
+- **Différence** : Outil d'analyse, pas d'identification NSG
+
+** Stratégie de diagnostic identifiée :**
+1. **Premier choix** : IP Flow Verify pour identifier rapidement le NSG
+2. **Deuxième choix** : NSG Flow Logs pour analyse historique
+3. **Dernier recours** : Packet Capture pour investigation approfondie
 
 ** Tips critiques identifiés :**
 
@@ -1083,17 +1254,94 @@ Can be used with subnet or NIC
 - **Higher bandwidth** : Jusqu'à 100 Gbps
 - **Lower latency** : Latence prévisible
 
+### 4.6 Azure Bastion
+
+#### Vue d'ensemble
+**Azure Bastion** est un service PaaS géré qui fournit une connectivité sécurisée aux VMs
+
+**Caractéristiques principales :**
+- **Connexion via navigateur** : RDP/SSH directement depuis le portail Azure
+- **Sécurité renforcée** : Pas d'exposition des ports RDP (3389) et SSH (22)
+- **Pas d'IP publique requise** : Les VMs restent complètement privées
+- **Protection DDoS** : Intégré avec Azure DDoS Protection
+- **Protocoles** : RDP et SSH via SSL (port 443)
+
+#### Comparaison des Solutions d'Accès aux VMs
+
+**Azure Bastion (Recommandé)**
+- **Avantage** : Sécurité maximale, pas d'exposition de ports
+- **Accès** : Via navigateur et portail Azure
+- **Configuration** : Service géré, simple à déployer
+- **Coût** : Service facturé par heure
+- **Usage** : Production, environnements sécurisés
+
+**Remote Desktop (RDP Direct)**
+- **Type** : Fonctionnalité du système d'exploitation Windows
+- **Exposition** : Port RDP (3389) exposé sur Internet
+- **Risque** : Vulnérable aux attaques brute force
+- **Configuration** : Nécessite IP publique sur la VM
+- **Usage** : Environnements de développement uniquement
+
+**Azure Monitor**
+- **Fonction** : Monitoring et diagnostics
+- **Limitation** : N'offre PAS de connectivité aux VMs
+- **Usage** : Surveillance des performances
+
+**Azure Network Watcher**
+- **Fonction** : Diagnostic réseau
+- **Limitation** : N'offre PAS de connectivité RDP/SSH
+- **Usage** : Troubleshooting connectivité
+
+** Point clé identifié :** Sécurité vs Accessibilité
+- **Azure Bastion** : Meilleure pratique pour accès sécurisé sans exposition de ports
+- **RDP Direct** : Solution simple mais dangereuse, exposée aux attaques
+- **Règle** : Toujours préférer Azure Bastion en production
+
+#### Références Microsoft
+- Quickstart - Create an Azure private DNS zone using the Azure portal | Microsoft Learn
+- Configure Azure DNS - Training | Microsoft Learn
+- Monitor and maintain Azure resources
+- Azure Network Watcher | Microsoft Learn
+
 ---
 
 ## 5. Monitor and Backup Azure Resources (10-15%)
 
 ### 5.1 Azure Monitor
 
-#### Architecture
+#### Architecture et Fonctionnalités
+**Azure Monitor** aide à maximiser la disponibilité et les performances des applications et services
+
 - **Data Collection** : Métriques, logs, traces
 - **Storage** : Metrics store, Log Analytics workspace
 - **Analysis** : KQL queries, workbooks, dashboards
 - **Actions** : Alerts, autoscale, automation
+
+**Différenciation des services de monitoring Azure :**
+
+**Azure Monitor**
+- **Fonction** : Maximiser disponibilité et performance des applications
+- **Capacités** : Collecte de métriques, logs, alertes, dashboards
+- **Usage** : Monitoring complet des ressources Azure
+- **API** : HTTP Data Collector API pour envoyer logs vers Log Analytics
+
+**Azure Network Watcher**
+- **Fonction** : Monitoring et diagnostic réseau
+- **Capacités** : IP Flow Verify, NSG Flow Logs, Packet Capture, Connection Monitor
+- **Usage** : Troubleshooting connectivité et diagnostic réseau
+- **Scope** : Ressources réseau uniquement (VNets, NSGs, VMs)
+
+**Azure Resource Manager**
+- **Fonction** : Service de déploiement et gestion Azure
+- **Capacités** : Déploiement, gestion du cycle de vie, RBAC
+- **Usage** : Infrastructure as Code, gestion des ressources
+- **Scope** : Pas un outil de monitoring
+
+**Network Security Groups (NSG)**
+- **Fonction** : Sécurité réseau (firewall)
+- **Capacités** : Règles de filtrage de trafic
+- **Usage** : Contrôle d'accès réseau
+- **Limitation** : Sécurité uniquement, pas de monitoring
 
 #### Cost Management et Budgets
 
@@ -1313,6 +1561,35 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 - Aucun accès par défaut
 - Global Admin doit s'élever
 
+### 9. Azure Bastion vs Remote Desktop
+** Erreur :** Exposer les ports RDP/SSH sur Internet
+** Correct :** Utiliser Azure Bastion
+- Azure Bastion = Accès via navigateur, pas d'exposition de ports
+- Remote Desktop = Ports exposés, vulnérable aux attaques
+- Azure Monitor et Network Watcher = Pas de connectivité aux VMs
+
+### 10. Private DNS Zone Association
+** Erreur :** Essayer d'utiliser directement une Private DNS Zone
+** Correct :** Créer un Virtual Network Link
+- Virtual Network Link = Associe VNet à Private DNS Zone
+- DNS Private Resolver = Proxy pour on-premises ↔ Azure
+- Custom DNS Server = Complexe et ne fonctionne pas avec Private DNS Zones
+
+### 11. Network Watcher IP Flow Verify
+** Erreur :** Utiliser NSG Flow Logs ou Packet Capture d'abord
+** Correct :** IP Flow Verify pour diagnostic rapide
+- IP Flow Verify = Identifie le NSG bloquant directement
+- NSG Flow Logs = Configuration complexe, analyse manuelle
+- Packet Capture = Détails mais pas d'identification NSG
+
+### 12. Load Balancer Troubleshooting
+** Erreur :** Modifier session persistence ou timeout pour résoudre connectivité
+** Correct :** Vérifier Health Probes, Ports, NSG rules
+- Health Probes = Configuration et réponses des VMs
+- Port Listening = Applications écoutent sur les bons ports
+- NSG Rules = Autoriser trafic au niveau subnet ET NIC
+- Session persistence/timeout = Ne résolvent pas les problèmes de base
+
 ---
 
 ## Checklist Final d'Examen
@@ -1322,6 +1599,8 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 - [ ] Custom domain DNS records : TXT ou MX
 - [ ] Root MG access : Global Admin + elevation
 - [ ] RBAC scopes : MG → Subscription → RG → Resource
+- [ ] **User Administrator** : Gestion utilisateurs et groupes (moindre privilège)
+- [ ] **Global Administrator** : Toutes permissions (à utiliser avec parcimonie)
 
 ### Storage
 - [ ] FileStorage pour Premium files uniquement
@@ -1344,6 +1623,11 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 - [ ] **NSG Priorities** : Plus bas = plus prioritaire (100 < 200)
 - [ ] **Session Persistence** : Client IP + Protocol pour sticky sessions
 - [ ] **Commandes réseau** : `netstat -an` pour ports d'écoute
+- [ ] **Azure Bastion** : Pas d'exposition RDP/SSH, accès via navigateur
+- [ ] **Private DNS Zone** : Virtual Network Link pour associer un VNet
+- [ ] **DNS Private Resolver** : Proxy DNS entre on-premises et Azure
+- [ ] **IP Flow Verify** : Identifier le NSG bloquant la communication
+- [ ] **Load Balancer Troubleshooting** : Health probes, ports, NSG rules
 
 ### Monitoring & Backup
 - [ ] Log Analytics Workspace comme target pour VM alerts
@@ -1351,6 +1635,9 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 - [ ] Recovery Services Vault : même région
 - [ ] Stop backup avant delete vault
 - [ ] KQL syntax : `Table | search "term"`
+- [ ] **Azure Monitor** : Maximiser disponibilité et performance des applications
+- [ ] **Network Watcher** : Monitoring réseau uniquement (pas connectivité VMs)
+- [ ] **NSG vs Monitoring** : NSG = sécurité, pas monitoring
 
 ---
 
