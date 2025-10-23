@@ -3,6 +3,7 @@
 ## 📋 Table des Matières
 1. [Manage Azure Identities and Governance (15-20%)](#1-manage-azure-identities-and-governance)
 2. [Implement and Manage Storage (15-20%)](#2-implement-and-manage-storage)
+   - [Azure Data Lake Storage Gen2](#24-azure-data-lake-storage-gen2)
 3. [Deploy and Manage Azure Compute Resources (20-25%)](#3-deploy-and-manage-azure-compute-resources)
 4. [Configure and Manage Virtual Networking (25-30%)](#4-configure-and-manage-virtual-networking)
 5. [Monitor and Backup Azure Resources (10-15%)](#5-monitor-and-backup-azure-resources)
@@ -474,7 +475,436 @@ Root Management Group
 - **Suppression automatique** : Basée sur l'âge
 - **Conditions** : Dernière modification, dernière accès, création
 
-### 2.4 Data Transfer Solutions (Mise à jour 2024)
+### 2.4 Azure Data Lake Storage Gen2
+
+#### Vue d'ensemble et Concepts Fondamentaux
+
+**Azure Data Lake Storage Gen2** est une solution de stockage optimisée pour l'analyse de données massives (Big Data)
+
+**Caractéristiques principales :**
+- **Basé sur Blob Storage** : Construit sur Azure Blob Storage avec fonctionnalités additionnelles
+- **Hierarchical Namespace (HNS)** : Organisation hiérarchique des fichiers et répertoires
+- **Haute performance** : Optimisé pour analytics et traitement parallèle
+- **Compatibilité Hadoop** : Support natif des systèmes de fichiers distribués
+- **Sécurité granulaire** : ACLs POSIX au niveau fichier/répertoire
+
+#### Hierarchical Namespace - Concept Clé
+
+**Hierarchical Namespace (Espace de noms hiérarchique)**
+
+**Qu'est-ce que c'est ?**
+- **Organisation** : Structure de répertoires et fichiers comme un système de fichiers traditionnel
+- **Activation** : Doit être activé lors de la création du compte de stockage
+- **Irréversible** : Une fois activé, ne peut pas être désactivé
+- **Impact** : Change fondamentalement la façon dont les données sont organisées
+
+**Comparaison Blob Storage vs Data Lake Storage Gen2 :**
+
+**Blob Storage (Sans HNS)**
+```
+container/
+├── folder1-file1.txt
+├── folder1-file2.txt
+└── folder2-subfolder1-file3.txt
+```
+- **Structure** : Flat namespace (plat)
+- **Organisation** : Tout est stocké au même niveau
+- **Séparateurs** : Les "/" dans les noms sont des caractères, pas de vrais dossiers
+- **Performance** : Opérations sur répertoires = opérations sur tous les blobs
+
+**Data Lake Storage Gen2 (Avec HNS)**
+```
+container/
+├── folder1/
+│   ├── file1.txt
+│   └── file2.txt
+└── folder2/
+    └── subfolder1/
+        └── file3.txt
+```
+- **Structure** : Hierarchical namespace (hiérarchique)
+- **Organisation** : Vrais répertoires et sous-répertoires
+- **Opérations** : Rename/delete de dossiers = opération atomique
+- **Performance** : Opérations sur répertoires = instantanées
+
+#### Avantages de Hierarchical Namespace
+
+**Performance :**
+- **Renommage de dossier** : Opération de métadonnées uniquement (instantané)
+- **Suppression de dossier** : Opération atomique unique
+- **Requêtes** : Filtrage de répertoires plus rapide
+- **Analytics** : Traitement parallèle optimisé
+
+**Gestion :**
+- **Organisation intuitive** : Structure familière aux utilisateurs
+- **Navigation** : Exploration de données simplifiée
+- **Maintenance** : Gestion de grandes quantités de données facilitée
+
+**Sécurité :**
+- **ACLs POSIX** : Permissions au niveau fichier/répertoire
+- **Héritage** : Permissions héritées des dossiers parents
+- **Granularité** : Contrôle d'accès précis
+
+#### Différences Clés : Blob Storage vs Data Lake Storage Gen2
+
+**Matrice comparative complète :**
+
+| Caractéristique | Blob Storage | Data Lake Storage Gen2 |
+|-----------------|--------------|------------------------|
+| **Namespace** | Flat (plat) | Hierarchical (hiérarchique) |
+| **Structure** | Container → Blobs | Container → Directories → Files |
+| **Renommage dossier** | Opération coûteuse | Opération atomique |
+| **ACLs POSIX** | Non supportées | Supportées |
+| **Hadoop compatibility** | Limitée | Native |
+| **Analytics performance** | Bonne | Excellente |
+| **Use case principal** | Stockage général | Big Data analytics |
+| **Prix** | Standard | Standard + coût HNS |
+| **Protocoles** | REST, NFS 3.0 | REST, NFS 3.0, ABFS |
+
+#### Activation de Hierarchical Namespace
+
+**Processus de création :**
+1. **Créer un compte de stockage** : StorageV2 (General Purpose v2)
+2. **Advanced settings** : Activer "Hierarchical namespace"
+3. **Validation** : Compte devient Data Lake Storage Gen2
+4. **Impact** : Activation irréversible
+
+** Point d'attention critique identifié :**
+- **Irréversibilité** : HNS ne peut pas être désactivé après activation
+- **Migration** : Migrer les données existantes vers nouveau compte si besoin
+- **Planification** : Décider en amont si HNS est nécessaire
+
+#### Sécurité et Contrôle d'Accès
+
+**Access Control Lists (ACLs) POSIX**
+
+**Permissions supportées :**
+- **Read (r)** : Lecture de fichiers, liste de répertoires
+- **Write (w)** : Modification de fichiers, création dans répertoires
+- **Execute (x)** : Traversée de répertoires
+
+**Types d'ACLs :**
+- **Access ACLs** : Contrôlent l'accès aux fichiers/répertoires
+- **Default ACLs** : Template pour nouveaux enfants (répertoires uniquement)
+
+**Niveaux d'application :**
+- **User** : Permissions pour utilisateur spécifique
+- **Group** : Permissions pour groupe spécifique
+- **Other** : Permissions pour tous les autres
+- **Mask** : Limite les permissions maximales
+
+**Exemple de configuration :**
+```
+user::rwx               # Propriétaire a tous les droits
+user:john:r-x          # John peut lire et traverser
+group::r-x             # Groupe propriétaire peut lire
+group:analysts:rwx     # Groupe analysts a tous les droits
+mask::rwx              # Masque maximal
+other::---             # Autres n'ont aucun droit
+```
+
+#### Méthodes d'Authentification
+
+**Azure Active Directory (Recommandé)**
+- **OAuth 2.0** : Authentification moderne
+- **Managed Identities** : Authentification sans secrets
+- **RBAC + ACLs** : Contrôle d'accès à deux niveaux
+- **Audit** : Traçabilité complète
+
+**Shared Key (Déconseillé en production)**
+- **Clés d'accès** : Accès complet au compte
+- **Risque** : Compromission = accès total
+- **Usage** : Développement uniquement
+
+**Shared Access Signature (SAS)**
+- **Accès délégué** : Limité dans le temps
+- **Granularité** : Permissions spécifiques
+- **Usage** : Accès temporaire externe
+
+#### Rôles RBAC pour Data Lake Storage Gen2
+
+**Storage Blob Data Owner**
+- **Accès complet** : Toutes les données + gestion des ACLs
+- **Super user** : Bypass les ACLs POSIX
+- **Usage** : Administrateurs de données
+
+**Storage Blob Data Contributor**
+- **Lecture/écriture** : Tous les blobs et fichiers
+- **Limitation** : Ne peut pas modifier les ACLs
+- **Usage** : Applications et utilisateurs nécessitant accès complet aux données
+
+**Storage Blob Data Reader**
+- **Lecture seule** : Tous les blobs et fichiers
+- **Usage** : Utilisateurs nécessitant accès lecture uniquement
+
+** Stratégie de sécurité identifiée :**
+1. **RBAC au niveau compte** : Contrôle d'accès global
+2. **ACLs au niveau fichier/répertoire** : Contrôle d'accès granulaire
+3. **Combinaison** : RBAC + ACLs pour sécurité maximale
+4. **Principe** : Le plus restrictif entre RBAC et ACLs s'applique
+
+#### Intégration avec Services Analytics Azure
+
+**Azure Synapse Analytics**
+- **Data warehousing** : Analyse de données massives
+- **PolyBase** : Requêtes SQL sur Data Lake
+- **Pipelines** : ETL/ELT intégrés
+- **Performance** : Optimisé pour analytics
+
+**Azure Databricks**
+- **Apache Spark** : Traitement distribué
+- **Delta Lake** : Couche ACID sur Data Lake
+- **Machine Learning** : Pipelines ML/AI
+- **Performance** : Scaling automatique
+
+**Azure HDInsight**
+- **Hadoop ecosystem** : Hive, Spark, HBase
+- **Compatibilité** : Compatibilité native HDFS
+- **Processing** : Batch et streaming
+- **Clusters** : Gestion de clusters Hadoop
+
+**Azure Data Factory**
+- **ETL/ELT** : Pipelines d'ingestion de données
+- **Connecteurs** : 90+ connecteurs de sources
+- **Orchestration** : Workflows automatisés
+- **Monitoring** : Surveillance intégrée
+
+#### Protocoles et APIs
+
+**ABFS (Azure Blob File System)**
+- **Driver Hadoop** : abfs:// ou abfss:// (secure)
+- **Performance** : Optimisé pour analytics
+- **Usage** : HDInsight, Databricks, Synapse
+- **Recommandé** : Pour tous les workloads Big Data
+
+**REST API**
+- **Blob Service API** : Compatible Blob Storage
+- **Data Lake Storage API** : Opérations HNS spécifiques
+- **Usage** : Applications custom
+- **Compatibilité** : Backward compatible
+
+**NFS 3.0 (Premium uniquement)**
+- **Linux native** : Montage direct
+- **Performance** : Faible latence
+- **Limitation** : Premium tiers uniquement
+- **Usage** : Workloads Linux haute performance
+
+#### Cas d'Usage et Scénarios
+
+**Big Data Analytics**
+- **Data Lake** : Centralisation de toutes les données
+- **Structure** : Raw → Curated → Enriched zones
+- **Processing** : Spark, Hive, Presto
+- **Avantage** : Scale illimité, coût optimisé
+
+**Machine Learning et IA**
+- **Training data** : Stockage de datasets d'entraînement
+- **Feature store** : Partage de features entre modèles
+- **Model registry** : Versioning de modèles
+- **Avantage** : Performance pour larges datasets
+
+**Data Warehousing**
+- **External tables** : Requêtes SQL sur Data Lake
+- **Data archival** : Archivage de données anciennes
+- **Tiering** : Hot/Cool/Archive pour optimisation coûts
+- **Avantage** : Séparation compute et storage
+
+**IoT et Streaming**
+- **Time-series data** : Stockage de données IoT
+- **Event capture** : Archive Event Hubs/IoT Hub
+- **Lambda architecture** : Batch + streaming layers
+- **Avantage** : Ingestion haute vitesse, stockage illimité
+
+#### Organisation des Données - Best Practices
+
+**Structure en zones (Medallion Architecture) :**
+
+**Bronze Layer (Raw)**
+```
+/bronze/
+├── source1/
+│   └── 2024/10/23/data.parquet
+└── source2/
+    └── 2024/10/23/data.json
+```
+- **Données brutes** : Format original, non transformées
+- **Partitionnement** : Par date, source, type
+- **Rétention** : Court/moyen terme selon besoin
+
+**Silver Layer (Curated)**
+```
+/silver/
+├── cleaned_data/
+│   └── year=2024/month=10/day=23/
+└── validated_data/
+    └── year=2024/month=10/day=23/
+```
+- **Données nettoyées** : Validation, déduplication
+- **Format optimisé** : Parquet, Delta Lake
+- **Partitionnement** : Optimisé pour requêtes
+
+**Gold Layer (Enriched)**
+```
+/gold/
+├── aggregated/
+│   └── monthly_summary/
+└── ml_features/
+    └── feature_set_v1/
+```
+- **Données business** : Agrégées, enrichies
+- **Prêtes pour analytics** : Requêtes directes
+- **Performance** : Indexation, caching
+
+** Points clés identifiés :**
+- **Séparation des couches** : Isolation des étapes de transformation
+- **Gouvernance** : ACLs différentes par couche
+- **Performance** : Optimisation par use case
+- **Coûts** : Lifecycle policies par couche
+
+#### Performance et Optimisation
+
+**Partitionnement des données :**
+- **Stratégie** : Partitionner par colonnes fréquemment filtrées (date, région, type)
+- **Granularité** : Éviter trop de petites partitions (< 100 MB)
+- **Exemple** : `/data/year=2024/month=10/day=23/`
+- **Avantage** : Pruning de partitions, scan réduit
+
+**Formats de fichiers :**
+- **Parquet** : Format colonnaire, compression efficace (recommandé)
+- **ORC** : Alternative à Parquet, optimisé pour Hive
+- **Avro** : Format row-based, schéma évolutif
+- **JSON/CSV** : Éviter pour production (performances faibles)
+
+**Taille des fichiers :**
+- **Optimal** : 128 MB - 1 GB par fichier
+- **Éviter** : Millions de petits fichiers (small files problem)
+- **Solution** : Compaction régulière avec Databricks ou ADF
+
+**Indexation et caching :**
+- **Delta Lake** : Z-ordering, data skipping
+- **Synapse** : Résult sets caching
+- **Databricks** : Delta cache, disk cache
+
+#### Lifecycle Management et Coûts
+
+**Access Tiers :**
+- **Hot** : Données fréquemment accédées (bronze, silver actif)
+- **Cool** : Données occasionnelles (> 30 jours, silver archive)
+- **Archive** : Données rarement accédées (> 180 jours, compliance)
+
+**Lifecycle Policies :**
+```json
+{
+  "rules": [
+    {
+      "name": "MoveToCool",
+      "type": "Lifecycle",
+      "definition": {
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["/bronze/"]
+        },
+        "actions": {
+          "baseBlob": {
+            "tierToCool": {"daysAfterModificationGreaterThan": 30}
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+**Stratégies d'optimisation des coûts :**
+- **Compression** : Parquet avec Snappy/ZSTD
+- **Tiering automatique** : Lifecycle policies
+- **Cleanup** : Suppression de données obsolètes
+- **Monitoring** : Azure Cost Management
+
+#### Erreurs Fréquentes et Pièges
+
+** Erreur 1 : HNS non activé pour Big Data **
+- **Symptôme** : Performances dégradées pour analytics
+- **Cause** : Compte Blob Storage standard utilisé
+- **Solution** : Créer nouveau compte avec HNS activé
+- **Prévention** : Toujours activer HNS pour workloads analytics
+
+** Erreur 2 : Confusion RBAC et ACLs **
+- **Symptôme** : Utilisateurs ne peuvent pas accéder malgré RBAC
+- **Cause** : ACLs POSIX bloquent l'accès
+- **Solution** : Vérifier les deux niveaux (RBAC + ACLs)
+- **Règle** : Le plus restrictif s'applique
+
+** Erreur 3 : Millions de petits fichiers **
+- **Symptôme** : Requêtes extrêmement lentes
+- **Cause** : Small files problem (fichiers < 1 MB)
+- **Solution** : Compaction avec Delta Lake ou ADF
+- **Prévention** : Configurer batch size d'ingestion (128 MB+)
+
+** Erreur 4 : Mauvais partitionnement **
+- **Symptôme** : Scans complets malgré filtres
+- **Cause** : Partitionnement non aligné avec requêtes
+- **Solution** : Re-partitionner selon colonnes filtrées
+- **Exemple** : Partitionner par date si filtres par date
+
+** Erreur 5 : Format JSON/CSV en production **
+- **Symptôme** : Coûts élevés, performances faibles
+- **Cause** : Formats non optimisés pour analytics
+- **Solution** : Convertir en Parquet
+- **Gain** : 5-10x compression, 10-100x performance
+
+#### Monitoring et Diagnostics
+
+**Métriques Azure Monitor :**
+- **Transactions** : Nombre de requêtes
+- **Ingress/Egress** : Données entrantes/sortantes
+- **Success rate** : Taux de succès des opérations
+- **Latency** : E2E latency, server latency
+
+**Diagnostic Logs :**
+- **StorageRead** : Opérations de lecture
+- **StorageWrite** : Opérations d'écriture
+- **StorageDelete** : Opérations de suppression
+- **Analyse** : Log Analytics pour requêtes KQL
+
+**Alertes recommandées :**
+- **High latency** : Latence > seuil
+- **Error rate** : Taux d'erreur élevé
+- **Throttling** : Dépassement de limites
+- **Cost spike** : Augmentation soudaine des coûts
+
+#### Comparaison avec Autres Solutions
+
+**Data Lake Storage Gen2 vs Gen1**
+- **Gen2** : Basé sur Blob Storage, HNS, ACLs POSIX, recommandé
+- **Gen1** : Service dédié, deprecated, migration vers Gen2 recommandée
+- **Migration** : Outils de migration disponibles (AdlCopy, ADF)
+
+**Data Lake Storage vs Azure Files**
+- **Data Lake** : Big Data analytics, PB de données
+- **Azure Files** : File shares, remplacement NAS/SAN
+- **Protocoles** : ABFS vs SMB/NFS
+- **Use case** : Analytics vs partage de fichiers
+
+**Data Lake Storage vs SQL Database**
+- **Data Lake** : Données non structurées/semi-structurées, schema-on-read
+- **SQL Database** : Données structurées, schema-on-write
+- **Scale** : Illimité vs limité (4 TB - 100 TB)
+- **Coût** : Très faible vs élevé
+
+#### Points Critiques pour l'Examen AZ-104
+
+✅ **Hierarchical Namespace** : Irréversible, requis pour analytics
+✅ **ACLs POSIX** : Permissions granulaires fichier/répertoire
+✅ **RBAC + ACLs** : Deux couches de sécurité, plus restrictif s'applique
+✅ **ABFS protocol** : Protocole optimisé pour Hadoop/Spark
+✅ **Storage Blob Data Owner** : Seul rôle permettant modification ACLs
+✅ **Partitionnement** : Clé pour performance analytics
+✅ **Parquet format** : Format recommandé pour Big Data
+✅ **Lifecycle policies** : Optimisation automatique des coûts
+✅ **Integration** : Synapse, Databricks, HDInsight, Data Factory
+
+### 2.5 Data Transfer Solutions (Mise à jour 2024)
 
 #### Azure Import/Export Service
 ** Destinations supportées identifiées :**
@@ -1607,6 +2037,11 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 - [ ] Import/Export destinations : Blob + Files (5TB max)
 - [ ] Replication types par account type
 - [ ] Port 445 pour Azure Files SMB
+- [ ] **Data Lake Storage Gen2** : Hierarchical Namespace irréversible
+- [ ] **ACLs POSIX** : Permissions granulaires + RBAC (le plus restrictif s'applique)
+- [ ] **ABFS protocol** : abfs:// ou abfss:// pour Hadoop/Spark
+- [ ] **Storage Blob Data Owner** : Seul rôle pour modifier ACLs
+- [ ] **Parquet format** : Format recommandé pour Big Data analytics
 
 ### Compute
 - [ ] Disque D: temporaire, C: persistant
