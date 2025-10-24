@@ -1314,7 +1314,7 @@ az vm create \
 ### 4.1 Virtual Networks (VNet)
 
 #### Concepts Fondamentaux
-- **Address Space** : Plage CIDR privée (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+- **Address Space** : Plage CIDR privée 10.0.0.0/8 (16M d'adresses), 172.16.0.0/12 (1M d'adresses), 192.168.0.0/16 (65k adresses)
 - **Subnets** : Subdivision du VNet
 - **Network Security Groups** : Firewalls au niveau subnet/NIC
 
