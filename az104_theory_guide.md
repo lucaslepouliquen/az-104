@@ -495,7 +495,7 @@ Root Management Group
 **Qu'est-ce que c'est ?**
 - **Organisation** : Structure de répertoires et fichiers comme un système de fichiers traditionnel
 - **Activation** : Doit être activé lors de la création du compte de stockage
-- **Irréversible** : Une fois activé, ne peut pas être désactivé
+- **Irréversible** : Une fois activé, ne peut pas être désactivé.
 - **Impact** : Change fondamentalement la façon dont les données sont organisées
 
 **Comparaison Blob Storage vs Data Lake Storage Gen2 :**
@@ -1043,10 +1043,164 @@ other::---             # Autres n'ont aucun droit
 #### High Availability
 
 **Availability Sets**
-- **Fault Domains** : Protection pannes matérielles (max 3)
-- **Update Domains** : Protection maintenances (max 20)
-- **SLA** : 99.95%
-- **Scope** : Même datacenter
+
+**Définition :**
+- **Groupement logique** de VMs pour assurer la haute disponibilité
+- **Protection** contre pannes matérielles ET maintenances planifiées
+- **Placement** : VMs distribuées sur plusieurs racks physiques
+- **Scope** : Même datacenter (single region, single datacenter)
+- **SLA** : 99.95% (au moins 1 VM disponible)
+- **Gratuit** : Aucun coût supplémentaire pour l'availability set lui-même
+
+**Composants Clés :**
+
+**1. Fault Domains (FD) - Domaines de Défaillance**
+- **Définition** : Représente un rack physique dans le datacenter
+- **Contenu** : Serveurs, switch réseau, source d'alimentation partagés
+- **Maximum** : 3 Fault Domains par availability set
+- **Protection** : Panne matérielle (hardware failure, power outage, network switch failure)
+- **Distribution** : Azure répartit automatiquement vos VMs sur les FDs
+
+**Visualisation des Fault Domains :**
+```
+Datacenter Azure
+├── Rack 1 (FD 0) - Alimentation A, Switch A
+│   ├── VM1
+│   └── VM4
+├── Rack 2 (FD 1) - Alimentation B, Switch B
+│   ├── VM2
+│   └── VM5
+└── Rack 3 (FD 2) - Alimentation C, Switch C
+    ├── VM3
+    └── VM6
+```
+
+**Scénario de panne FD :**
+- **Problème** : Rack 1 perd l'alimentation électrique
+- **Impact** : Seules VM1 et VM4 sont affectées
+- **Résultat** : VM2, VM3, VM5, VM6 continuent de fonctionner
+- **Disponibilité** : Au moins 2/3 des VMs restent disponibles
+
+**2. Update Domains (UD) - Domaines de Mise à Jour**
+- **Définition** : Groupe logique de VMs redémarrées ensemble lors de maintenances
+- **Par défaut** : 5 Update Domains (si non spécifié à la création)
+- **Configurable** : De 1 à 20 Update Domains maximum
+- **Important** : Configuration définie à la création, non modifiable après
+- **Protection** : Maintenance planifiée Azure (host OS updates, hardware maintenance)
+- **Processus** : Azure redémarre un seul UD à la fois
+- **Délai** : 30 minutes entre chaque UD redémarré
+
+**Visualisation des Update Domains :**
+```
+Update Domain 0: VM1, VM6
+Update Domain 1: VM2, VM7
+Update Domain 2: VM3, VM8
+Update Domain 3: VM4, VM9
+Update Domain 4: VM5, VM10
+
+Maintenance planifiée :
+Étape 1: Redémarre UD0 → VM1, VM6 offline, autres OK
+[Attend 30 min]
+Étape 2: Redémarre UD1 → VM2, VM7 offline, autres OK
+[Attend 30 min]
+Étape 3: Redémarre UD2 → VM3, VM8 offline, autres OK
+...
+```
+
+**Scénario de maintenance UD :**
+- **Événement** : Maintenance planifiée Azure
+- **Processus** : Azure redémarre UD par UD (jamais simultanément)
+- **Impact** : Maximum 1/5 (20%) des VMs offline à un moment donné
+- **Garantie** : Au moins 80% de capacité maintenue
+
+**3. Combinaison FD + UD - Protection Double**
+
+**Matrice de Distribution (Exemple : 6 VMs, 3 FD, 3 UD) :**
+```
+              FD 0 (Rack 1)  FD 1 (Rack 2)  FD 2 (Rack 3)
+UD 0            VM1             VM2             VM3
+UD 1            VM4             VM5             VM6
+UD 2            VM7             VM8             VM9
+```
+
+**Protection simultanée :**
+- **Panne FD 1** : Perd VM2, VM5, VM8 → Garde VM1,3,4,6,7,9
+- **Maintenance UD 0** : Redémarre VM1, VM2, VM3 → Garde VM4,5,6,7,8,9
+- **Combiné** : Jamais plus d'un FD ET un UD affecté en même temps
+
+**Configuration et Contraintes :**
+
+**Création :**
+- **Moment** : Doit être configuré AVANT ou PENDANT la création de la VM
+- **Modification** : IMPOSSIBLE de changer l'availability set d'une VM existante
+- **Solution** : Recréer la VM si changement nécessaire
+
+**Limitations importantes :**
+- **Zone géographique** : Limité à un seul datacenter
+- **Maximum VMs** : Limite pratique (recommandé : < 200 VMs)
+- **Famille de VM** : Toutes les VMs doivent être de tailles compatibles
+- **Managed Disks** : Fortement recommandé (Aligned ou non)
+- **Incompatibilité** : Ne peut PAS combiner avec Availability Zones
+
+**Configuration PowerShell :**
+```powershell
+# Créer l'Availability Set
+New-AzAvailabilitySet `
+  -ResourceGroupName "myRG" `
+  -Name "myAvailabilitySet" `
+  -Location "East US" `
+  -PlatformFaultDomainCount 3 `
+  -PlatformUpdateDomainCount 5 `
+  -Sku Aligned
+
+# Créer VM dans l'Availability Set
+New-AzVM `
+  -ResourceGroupName "myRG" `
+  -Name "myVM" `
+  -AvailabilitySetName "myAvailabilitySet" `
+  ...
+```
+
+**Configuration Azure CLI :**
+```bash
+# Créer l'Availability Set
+az vm availability-set create \
+  --resource-group myRG \
+  --name myAvailabilitySet \
+  --platform-fault-domain-count 3 \
+  --platform-update-domain-count 5
+
+# Créer VM dans l'Availability Set
+az vm create \
+  --resource-group myRG \
+  --name myVM \
+  --availability-set myAvailabilitySet \
+  ...
+```
+
+**Best Practices :**
+
+1. **Minimum 2 VMs par tier** : Pour bénéficier du SLA 99.95%
+2. **Utiliser Managed Disks** : Meilleure résilience (Storage Fault Domains)
+3. **Load Balancer** : Combiner avec Azure Load Balancer pour distribution trafic
+4. **Même fonction** : Regrouper uniquement VMs ayant le même rôle
+5. **Planification** : Configurer dès la création, impossible à modifier après
+
+**Cas d'usage typiques :**
+- **Web tier** : Serveurs web dans un availability set
+- **App tier** : Serveurs applicatifs dans un autre availability set
+- **Data tier** : Serveurs de base de données dans un troisième availability set
+- **Séparation** : Un availability set différent par tier applicatif
+
+**Comparaison rapide :**
+| Caractéristique | Availability Sets | Availability Zones |
+|-----------------|-------------------|-------------------|
+| **Protection** | Rack failure | Datacenter failure |
+| **Fault Domains** | Max 3 | 3 zones |
+| **Scope** | Single datacenter | Multiple datacenters |
+| **SLA** | 99.95% | 99.99% |
+| **Latence** | Minimale | Légèrement plus élevée |
+| **Coût** | Gratuit | Frais de transfert inter-zones |
 
 **Availability Zones**
 - **Protection** : Datacenters physiquement séparés
