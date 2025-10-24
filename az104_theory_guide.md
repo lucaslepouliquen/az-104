@@ -1467,10 +1467,317 @@ Can be used with subnet or NIC
 
 ### 4.3 Load Balancing Solutions
 
-#### Azure Load Balancer (Layer 4)
-- **Internal** : Trafic interne au VNet
-- **Public** : Trafic depuis Internet
-- **Features** : Health probes, NAT rules, HA ports
+#### Azure Load Balancer (Layer 4) - Guide DevOps Approfondi
+
+**Architecture et Composants :**
+
+**Types de Load Balancer :**
+1. **Public Load Balancer**
+   - **Frontend** : Adresse IP publique
+   - **Usage** : Trafic Internet → VMs backend
+   - **Cas d'usage** : Applications web, APIs publiques
+   - **NAT** : Traduit IP publique → IP privées backend
+
+2. **Internal Load Balancer (ILB)**
+   - **Frontend** : Adresse IP privée du VNet
+   - **Usage** : Trafic interne entre tiers applicatifs
+   - **Cas d'usage** : App tier → Database tier, microservices
+   - **Sécurité** : Jamais exposé à Internet
+
+**SKUs - Différences Critiques :**
+
+| Caractéristique | Basic | Standard |
+|-----------------|-------|----------|
+| **Backend pool size** | 300 VMs | 1000 VMs |
+| **Health probes** | TCP, HTTP | TCP, HTTP, HTTPS |
+| **Availability Zones** | ❌ Non | ✅ Oui |
+| **SLA** | Aucun | 99.99% |
+| **HA Ports** | ❌ Non | ✅ Oui |
+| **Outbound rules** | Basiques | Avancées |
+| **Sécurité** | Open par défaut | Fermé par défaut |
+| **Coût** | Gratuit | ~$18/mois + data |
+| **Production** | ⚠️ Non recommandé | ✅ Recommandé |
+
+**⚠️ IMPORTANT DevOps** : Basic SKU sera déprécié en 2025. Toujours utiliser Standard SKU.
+
+**Composants Techniques Détaillés :**
+
+**1. Frontend IP Configuration**
+```bash
+# Public Load Balancer
+az network lb create \
+  --resource-group myRG \
+  --name myPublicLB \
+  --sku Standard \
+  --public-ip-address myPublicIP \
+  --frontend-ip-name myFrontend
+
+# Internal Load Balancer
+az network lb create \
+  --resource-group myRG \
+  --name myInternalLB \
+  --sku Standard \
+  --vnet-name myVNet \
+  --subnet mySubnet \
+  --frontend-ip-name myFrontend \
+  --private-ip-address 10.0.1.10
+```
+
+**2. Backend Pool - Options de Configuration**
+
+**A. VM-based Backend Pool**
+```bash
+# Ajouter des VMs au backend pool
+az network nic ip-config address-pool add \
+  --resource-group myRG \
+  --nic-name myNIC \
+  --ip-config-name ipconfig1 \
+  --lb-name myLB \
+  --address-pool myBackendPool
+```
+
+**B. IP-based Backend Pool (Standard SKU only)**
+```bash
+# Créer backend pool avec IP addresses
+az network lb address-pool create \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name myBackendPool
+
+# Ajouter une IP au pool
+az network lb address-pool address add \
+  --resource-group myRG \
+  --lb-name myLB \
+  --pool-name myBackendPool \
+  --name backend1 \
+  --ip-address 10.0.1.4
+```
+
+**C. VMSS Backend Pool (Auto-scaling)**
+```bash
+# Associer VMSS au load balancer
+az vmss create \
+  --resource-group myRG \
+  --name myVMSS \
+  --image UbuntuLTS \
+  --load-balancer myLB \
+  --backend-pool-name myBackendPool
+```
+
+**3. Health Probes - Configuration Avancée**
+
+**Types de Probes :**
+
+**TCP Probe (Recommandé pour bases de données)**
+```bash
+az network lb probe create \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name tcpProbe \
+  --protocol tcp \
+  --port 1433 \
+  --interval 15 \
+  --threshold 2
+```
+- **Fonctionnement** : Vérifie si le port répond (TCP handshake)
+- **Avantage** : Léger, rapide
+- **Inconvénient** : Ne vérifie pas si l'application fonctionne
+
+**HTTP/HTTPS Probe (Recommandé pour web apps)**
+```bash
+az network lb probe create \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name httpProbe \
+  --protocol http \
+  --port 80 \
+  --path /health \
+  --interval 15 \
+  --threshold 2
+```
+- **Fonctionnement** : Attend HTTP 200 OK
+- **Avantage** : Vérifie la santé applicative
+- **Best practice** : Créer un endpoint `/health` ou `/healthz` dédié
+
+**Endpoint Health Check - Pattern DevOps**
+```python
+# Flask example
+@app.route('/health')
+def health_check():
+    try:
+        # Vérifier DB connectivity
+        db.session.execute('SELECT 1')
+        # Vérifier dependencies
+        redis_client.ping()
+        return jsonify({"status": "healthy"}), 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 503
+```
+
+**Paramètres de Health Probe - Tuning Performance**
+- **Interval** : Fréquence des checks (5-300 sec, défaut: 15)
+- **Threshold** : Nombre d'échecs avant marquage unhealthy (défaut: 2)
+- **Calcul downtime** : `interval × threshold = temps avant exclusion`
+  - Exemple : 15s × 2 = 30 secondes avant que VM soit retirée
+- **Trade-off** : Interval court = détection rapide mais plus de charge
+
+**4. Load Balancing Rules - Distribution du Trafic**
+
+**Rule Basique**
+```bash
+az network lb rule create \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name myHTTPRule \
+  --protocol tcp \
+  --frontend-port 80 \
+  --backend-port 80 \
+  --frontend-ip-name myFrontend \
+  --backend-pool-name myBackendPool \
+  --probe-name httpProbe \
+  --disable-outbound-snat false \
+  --idle-timeout 15 \
+  --enable-tcp-reset true
+```
+
+**Distribution Algorithms (Session Affinity)**
+
+**A. 5-Tuple Hash (Défaut) - Aucune session persistence**
+```
+Hash = (Source IP, Source Port, Dest IP, Dest Port, Protocol)
+```
+- **Comportement** : Distribution équitable
+- **Usage** : Applications stateless
+- **Avantage** : Meilleure répartition de charge
+
+**B. 3-Tuple Hash (Source IP affinity)**
+```
+Hash = (Source IP, Dest IP, Protocol)
+```
+```bash
+az network lb rule update \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name myHTTPRule \
+  --load-distribution SourceIP
+```
+- **Comportement** : Même client → même backend
+- **Usage** : Applications avec état (sessions)
+- **Durée** : Pendant la durée de la session TCP
+
+**C. 2-Tuple Hash (Source IP + Protocol affinity)**
+```
+Hash = (Source IP, Protocol)
+```
+```bash
+az network lb rule update \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name myHTTPRule \
+  --load-distribution SourceIPProtocol
+```
+- **Comportement** : Client → toujours même backend pour ce protocole
+- **Usage** : FTP, RDP, applications legacy
+
+**Pattern DevOps - Choix de Distribution**
+| Application Type | Distribution | Raison |
+|------------------|--------------|--------|
+| **REST API stateless** | 5-tuple (défaut) | Pas de session, max performance |
+| **E-commerce avec panier** | 3-tuple (SourceIP) | Maintenir sessions utilisateur |
+| **WebSockets** | 3-tuple (SourceIP) | Connexion persistante |
+| **Remote Desktop** | 2-tuple (SourceIPProtocol) | Session RDP stable |
+| **Microservices** | 5-tuple (défaut) | Stateless, scalabilité max |
+
+**5. HA Ports (Standard SKU Only) - Pattern Avancé**
+
+**Configuration**
+```bash
+az network lb rule create \
+  --resource-group myRG \
+  --lb-name myInternalLB \
+  --name HAPortsRule \
+  --protocol All \
+  --frontend-port 0 \
+  --backend-port 0 \
+  --frontend-ip-name myFrontend \
+  --backend-pool-name myBackendPool
+```
+
+**Cas d'usage DevOps**
+- **Network Virtual Appliances (NVA)** : Firewalls, IDS/IPS
+- **Architecture Hub-Spoke** : Load balancing de tous les flux
+- **Port forwarding dynamique** : Pas besoin de règles par port
+
+**6. Outbound Rules - Contrôle du Trafic Sortant**
+
+**Problème** : Par défaut, VMs derrière ILB ne peuvent pas accéder à Internet
+
+**Solution A : Outbound Rule avec Public LB**
+```bash
+az network lb outbound-rule create \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name myOutboundRule \
+  --frontend-ip-configs myFrontend \
+  --protocol All \
+  --idle-timeout 15 \
+  --outbound-ports 10000 \
+  --address-pool myBackendPool
+```
+
+**Solution B : NAT Gateway (Recommandé pour production)**
+```bash
+az network nat gateway create \
+  --resource-group myRG \
+  --name myNATGateway \
+  --public-ip-addresses myPublicIP \
+  --idle-timeout 10
+
+az network vnet subnet update \
+  --resource-group myRG \
+  --vnet-name myVNet \
+  --name mySubnet \
+  --nat-gateway myNATGateway
+```
+
+**7. Inbound NAT Rules - Accès Direct aux VMs**
+
+**Use Case** : SSH/RDP vers VMs spécifiques derrière LB
+```bash
+# Port 2221 → VM1:22
+az network lb inbound-nat-rule create \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name SSH-VM1 \
+  --protocol tcp \
+  --frontend-port 2221 \
+  --backend-port 22 \
+  --frontend-ip-name myFrontend
+
+# Port 2222 → VM2:22
+az network lb inbound-nat-rule create \
+  --resource-group myRG \
+  --lb-name myLB \
+  --name SSH-VM2 \
+  --protocol tcp \
+  --frontend-port 2222 \
+  --backend-port 22 \
+  --frontend-ip-name myFrontend
+
+# Associer à la NIC
+az network nic ip-config inbound-nat-rule add \
+  --resource-group myRG \
+  --nic-name myVM1-NIC \
+  --ip-config-name ipconfig1 \
+  --inbound-nat-rule SSH-VM1
+```
+
+**Pattern DevOps - Bastion Alternative**
+```
+Internet → LB Public IP:2221 → VM1:22
+Internet → LB Public IP:2222 → VM2:22
+Internet → LB Public IP:2223 → VM3:22
+```
 
 #### Troubleshooting Load Balancer - Standard SKU
 
@@ -1534,11 +1841,1010 @@ Can be used with subnet or NIC
 - **Combinaison** : Client IP + Protocol pour une persistance maximale
 - **Performance** : Équilibrer entre persistance et répartition de charge
 
-#### Application Gateway (Layer 7)
-- **WAF** : Web Application Firewall
-- **SSL termination** : Gestion certificates
-- **URL routing** : Routage basé sur l'URL
-- **Multi-site hosting** : Plusieurs sites web
+#### Application Gateway (Layer 7) - Guide DevOps Approfondi
+
+**Architecture et Composants :**
+
+Application Gateway est un **reverse proxy intelligent** opérant au Layer 7 (HTTP/HTTPS).
+
+**SKUs et Versions :**
+
+| Caractéristique | v1 Standard | v1 WAF | v2 Standard | v2 WAF |
+|-----------------|-------------|--------|-------------|--------|
+| **Autoscaling** | ❌ Non | ❌ Non | ✅ Oui | ✅ Oui |
+| **Availability Zones** | ❌ Non | ❌ Non | ✅ Oui | ✅ Oui |
+| **Static VIP** | ❌ Non | ❌ Non | ✅ Oui | ✅ Oui |
+| **WAF** | ❌ Non | ✅ Oui | ❌ Non | ✅ Oui |
+| **Performance** | 1000 Mbps | 1000 Mbps | Supérieure | Supérieure |
+| **Rewrite HTTP** | ❌ Non | ❌ Non | ✅ Oui | ✅ Oui |
+| **Custom Error Pages** | ❌ Non | ❌ Non | ✅ Oui | ✅ Oui |
+| **Status** | ⚠️ Legacy | ⚠️ Legacy | ✅ Recommandé | ✅ Recommandé |
+| **Coût/mois (estimé)** | ~$125 | ~$250 | ~$200+ | ~$300+ |
+
+**⚠️ IMPORTANT DevOps** : v1 est en maintenance. Toujours déployer v2 pour nouvelles installations.
+
+**Composants de l'Application Gateway :**
+
+**1. Frontend IP Configuration**
+- **Public IP** : Exposition Internet (obligatoire pour v2)
+- **Private IP** : Exposition interne VNet (optionnel)
+- **Both** : Combinaison public + private possible
+
+```bash
+# Créer Application Gateway v2 avec autoscaling
+az network application-gateway create \
+  --name myAppGateway \
+  --resource-group myRG \
+  --sku WAF_v2 \
+  --capacity 2 \
+  --min-capacity 2 \
+  --max-capacity 10 \
+  --vnet-name myVNet \
+  --subnet appGatewaySubnet \
+  --public-ip-address myPublicIP \
+  --http-settings-cookie-based-affinity Enabled \
+  --http-settings-protocol Http \
+  --frontend-port 80 \
+  --priority 100
+```
+
+**2. Backend Pools - Multi-type Support**
+
+Application Gateway peut cibler :
+- **VMs** : Machines virtuelles Azure
+- **VMSS** : VM Scale Sets
+- **App Services** : Azure Web Apps
+- **IP/FQDN** : Serveurs on-premises ou autres clouds
+- **Private Link** : Services privés Azure
+
+```bash
+# Backend pool avec plusieurs types
+az network application-gateway address-pool create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myBackendPool \
+  --servers 10.0.1.4 10.0.1.5 webapp.azurewebsites.net
+```
+
+**3. HTTP Settings - Configuration Backend**
+
+```bash
+az network application-gateway http-settings create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myHTTPSettings \
+  --port 80 \
+  --protocol Http \
+  --cookie-based-affinity Enabled \
+  --timeout 30 \
+  --probe myHealthProbe \
+  --host-name-from-backend-pool false \
+  --host-name api.internal.com
+```
+
+**Paramètres clés :**
+- **Cookie-based affinity** : Session persistence (cookie ApplicationGatewayAffinity)
+- **Connection draining** : Termine proprement les connexions lors de retrait backend
+- **Timeout** : 1-86400 secondes (défaut: 30)
+- **Override backend hostname** : Réécrit le header Host
+
+**4. Health Probes - Monitoring Avancé**
+
+**Probe Custom HTTP**
+```bash
+az network application-gateway probe create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myHealthProbe \
+  --protocol Http \
+  --host-name-from-http-settings true \
+  --path /api/health \
+  --interval 30 \
+  --timeout 30 \
+  --threshold 3 \
+  --match-status-codes 200-399
+```
+
+**Pattern DevOps - Health Endpoint Avancé**
+```javascript
+// Node.js/Express example
+app.get('/api/health', async (req, res) => {
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    checks: {}
+  };
+  
+  try {
+    // Database check
+    await db.query('SELECT 1');
+    health.checks.database = 'ok';
+    
+    // Redis check
+    await redis.ping();
+    health.checks.cache = 'ok';
+    
+    // External API check
+    const apiHealth = await fetch('https://api.external.com/health');
+    health.checks.externalAPI = apiHealth.ok ? 'ok' : 'degraded';
+    
+    res.status(200).json(health);
+  } catch (error) {
+    health.status = 'unhealthy';
+    health.error = error.message;
+    res.status(503).json(health);
+  }
+});
+```
+
+**5. Listeners (HTTP/HTTPS)**
+
+**HTTP Listener Basique**
+```bash
+az network application-gateway http-listener create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myHTTPListener \
+  --frontend-port appGatewayFrontendPort \
+  --frontend-ip appGatewayFrontendIP \
+  --host-name www.contoso.com
+```
+
+**HTTPS Listener avec SSL Certificate**
+```bash
+# Upload SSL certificate
+az network application-gateway ssl-cert create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myCert \
+  --cert-file /path/to/cert.pfx \
+  --cert-password "P@ssw0rd"
+
+# Créer HTTPS listener
+az network application-gateway http-listener create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myHTTPSListener \
+  --frontend-port 443 \
+  --frontend-ip appGatewayFrontendIP \
+  --ssl-cert myCert \
+  --host-name www.contoso.com
+```
+
+**Multi-site Listener (Plusieurs domaines)**
+```bash
+# Listener pour site 1
+az network application-gateway http-listener create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name site1Listener \
+  --frontend-port 443 \
+  --ssl-cert cert1 \
+  --host-names www.site1.com site1.com
+
+# Listener pour site 2
+az network application-gateway http-listener create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name site2Listener \
+  --frontend-port 443 \
+  --ssl-cert cert2 \
+  --host-names www.site2.com site2.com
+```
+
+**6. Routing Rules - Logique de Distribution**
+
+**A. Basic Routing Rule**
+```bash
+az network application-gateway rule create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name rule1 \
+  --http-listener myHTTPListener \
+  --rule-type Basic \
+  --address-pool myBackendPool \
+  --http-settings myHTTPSettings \
+  --priority 100
+```
+
+**B. Path-based Routing (URL Routing)**
+```bash
+# Créer URL path map
+az network application-gateway url-path-map create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myPathMap \
+  --paths /api/* \
+  --address-pool apiBackendPool \
+  --http-settings apiHTTPSettings \
+  --default-address-pool defaultBackendPool \
+  --default-http-settings defaultHTTPSettings
+
+# Path rule pour /images
+az network application-gateway url-path-map rule create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --path-map-name myPathMap \
+  --name imagesRule \
+  --paths /images/* \
+  --address-pool imagesBackendPool \
+  --http-settings imagesHTTPSettings
+
+# Associer à routing rule
+az network application-gateway rule create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name pathRoutingRule \
+  --http-listener myListener \
+  --rule-type PathBasedRouting \
+  --url-path-map myPathMap \
+  --priority 200
+```
+
+**Architecture Path-based Routing :**
+```
+www.contoso.com
+├── /api/*          → API Backend Pool (port 8080)
+├── /images/*       → CDN/Storage Backend Pool
+├── /admin/*        → Admin Backend Pool (port 9000)
+└── /*              → Web Frontend Backend Pool (port 80)
+```
+
+**7. SSL/TLS Configuration - Patterns DevOps**
+
+**A. SSL Termination (Déchiffrement au Gateway)**
+```
+Client (HTTPS) → App Gateway (déchiffre) → Backend (HTTP)
+```
+- **Avantage** : Offload SSL processing des backends
+- **Usage** : Applications internes, microservices
+- **Coût CPU** : Gateway gère le chiffrement
+
+**B. End-to-End SSL (SSL de bout en bout)**
+```
+Client (HTTPS) → App Gateway (HTTPS) → Backend (HTTPS)
+```
+```bash
+az network application-gateway http-settings update \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myHTTPSettings \
+  --protocol Https \
+  --port 443 \
+  --trusted-root-certificates backendCert
+```
+- **Avantage** : Sécurité maximale
+- **Usage** : Conformité, données sensibles
+- **Requis** : Certificats SSL sur backends
+
+**C. SSL Policy Configuration**
+```bash
+# Politique SSL moderne (TLS 1.2+)
+az network application-gateway ssl-policy set \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --min-protocol-version TLSv1_2 \
+  --cipher-suites TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 \
+                 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+```
+
+**8. Web Application Firewall (WAF) - Sécurité Avancée**
+
+**WAF Modes :**
+- **Detection** : Log les attaques, ne bloque pas
+- **Prevention** : Bloque les attaques détectées
+
+```bash
+# Activer WAF en mode Prevention
+az network application-gateway waf-config set \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --enabled true \
+  --firewall-mode Prevention \
+  --rule-set-type OWASP \
+  --rule-set-version 3.2
+```
+
+**OWASP Top 10 Protection :**
+1. **Injection** (SQL, NoSQL, LDAP)
+2. **Broken Authentication**
+3. **Sensitive Data Exposure**
+4. **XML External Entities (XXE)**
+5. **Broken Access Control**
+6. **Security Misconfiguration**
+7. **Cross-Site Scripting (XSS)**
+8. **Insecure Deserialization**
+9. **Using Components with Known Vulnerabilities**
+10. **Insufficient Logging & Monitoring**
+
+**Custom WAF Rules**
+```bash
+# Bloquer une IP spécifique
+az network application-gateway waf-policy custom-rule create \
+  --policy-name myWAFPolicy \
+  --resource-group myRG \
+  --name blockIP \
+  --priority 100 \
+  --rule-type MatchRule \
+  --action Block \
+  --match-conditions RemoteAddr IPMatch 192.168.1.100
+
+# Rate limiting (DDoS protection)
+az network application-gateway waf-policy custom-rule create \
+  --policy-name myWAFPolicy \
+  --resource-group myRG \
+  --name rateLimitRule \
+  --priority 200 \
+  --rule-type RateLimitRule \
+  --action Block \
+  --rate-limit-duration OneMin \
+  --rate-limit-threshold 100
+```
+
+**9. Rewrite Rules (v2 only) - Manipulation HTTP**
+
+**A. Rewrite Headers**
+```bash
+# Rewrite Set
+az network application-gateway rewrite-rule set create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myRewriteSet
+
+# Ajouter X-Forwarded-For
+az network application-gateway rewrite-rule create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --rule-set-name myRewriteSet \
+  --name addXForwardedFor \
+  --sequence 100 \
+  --request-headers X-Forwarded-For="{var_client_ip}"
+
+# Supprimer header sensible
+az network application-gateway rewrite-rule create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --rule-set-name myRewriteSet \
+  --name removeServerHeader \
+  --sequence 200 \
+  --response-headers Server=""
+```
+
+**B. URL Rewrite**
+```bash
+# Rediriger /old vers /new
+az network application-gateway rewrite-rule create \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --rule-set-name myRewriteSet \
+  --name urlRewrite \
+  --sequence 300 \
+  --request-headers Location="/new" \
+  --conditions http_req_url Equal "/old"
+```
+
+**Use Cases DevOps :**
+- **Ajouter headers de sécurité** : HSTS, X-Frame-Options, CSP
+- **Client IP forwarding** : X-Forwarded-For pour les backends
+- **Masquer technologies** : Supprimer Server, X-Powered-By
+- **URL canonicalization** : Normaliser les URLs
+
+**10. Autoscaling (v2 only)**
+
+```bash
+az network application-gateway update \
+  --name myAppGateway \
+  --resource-group myRG \
+  --min-capacity 2 \
+  --max-capacity 10
+```
+
+**Calcul de capacité :**
+- **1 Capacity Unit** = 2500 connexions/sec persistantes
+- **Scaling** : Basé sur CPU, connexions, throughput
+- **Temps** : ~6-7 minutes pour scale out/in
+- **Coût** : Pay-per-capacity-unit-hour
+
+**11. Monitoring et Diagnostics - DevOps Essentials**
+
+**Métriques Clés à Monitorer :**
+```bash
+# CPU Utilization
+az monitor metrics list \
+  --resource myAppGateway \
+  --resource-group myRG \
+  --resource-type Microsoft.Network/applicationGateways \
+  --metric "CpuUtilization"
+
+# Response time
+az monitor metrics list \
+  --resource myAppGateway \
+  --resource-group myRG \
+  --metric "ApplicationGatewayTotalTime"
+
+# Failed requests
+az monitor metrics list \
+  --resource myAppGateway \
+  --resource-group myRG \
+  --metric "FailedRequests"
+```
+
+**Logs Diagnostiques :**
+```bash
+# Activer logs
+az monitor diagnostic-settings create \
+  --name myDiagnostics \
+  --resource myAppGatewayId \
+  --logs '[
+    {
+      "category": "ApplicationGatewayAccessLog",
+      "enabled": true
+    },
+    {
+      "category": "ApplicationGatewayPerformanceLog",
+      "enabled": true
+    },
+    {
+      "category": "ApplicationGatewayFirewallLog",
+      "enabled": true
+    }
+  ]' \
+  --workspace myLogAnalyticsWorkspace
+```
+
+**KQL Queries pour Troubleshooting :**
+```kql
+// Top 10 erreurs 5xx
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS"
+| where httpStatus_d >= 500
+| summarize count() by httpStatus_d, requestUri_s
+| top 10 by count_
+
+// Requêtes lentes (>3 secondes)
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS"
+| where timeTaken_d > 3000
+| project TimeGenerated, requestUri_s, timeTaken_d, clientIP_s
+| order by timeTaken_d desc
+
+// WAF blocks
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS"
+| where action_s == "Blocked"
+| summarize count() by ruleId_s, Message
+| order by count_ desc
+```
+
+**12. Architecture Patterns DevOps**
+
+**Pattern A : Multi-Region avec Traffic Manager**
+```
+Traffic Manager (DNS)
+├── Region 1: App Gateway → Backend Pool 1
+└── Region 2: App Gateway → Backend Pool 2
+```
+
+**Pattern B : Microservices Routing**
+```
+App Gateway
+├── /user-service/*     → User Microservice Pool
+├── /order-service/*    → Order Microservice Pool
+├── /payment-service/*  → Payment Microservice Pool
+└── /static/*           → CDN/Storage
+```
+
+**Pattern C : Blue/Green Deployment**
+```bash
+# Backend pools
+- bluePool (v1.0 - production actuelle)
+- greenPool (v2.0 - nouvelle version)
+
+# Étape 1: Déployer v2.0 dans greenPool
+# Étape 2: Tester greenPool (health probes)
+# Étape 3: Switcher routing rule: bluePool → greenPool
+# Étape 4: Monitorer
+# Étape 5: Rollback si problème (greenPool → bluePool)
+```
+
+**Pattern D : Canary Deployment (avec Path Rules)**
+```bash
+# 95% trafic → stable backend
+# 5% trafic → canary backend
+
+# Utiliser weighted routing ou custom headers
+X-Canary-User: true → Canary Backend
+```
+
+**13. Infrastructure as Code - Terraform Examples**
+
+**A. Load Balancer Standard avec Backend Pool**
+```hcl
+# Public IP
+resource "azurerm_public_ip" "lb" {
+  name                = "lb-public-ip"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
+# Load Balancer
+resource "azurerm_lb" "main" {
+  name                = "main-lb"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  sku                 = "Standard"
+
+  frontend_ip_configuration {
+    name                 = "PublicIPAddress"
+    public_ip_address_id = azurerm_public_ip.lb.id
+  }
+}
+
+# Backend Pool
+resource "azurerm_lb_backend_address_pool" "main" {
+  loadbalancer_id = azurerm_lb.main.id
+  name            = "backend-pool"
+}
+
+# Health Probe
+resource "azurerm_lb_probe" "http" {
+  loadbalancer_id = azurerm_lb.main.id
+  name            = "http-probe"
+  protocol        = "Http"
+  request_path    = "/health"
+  port            = 80
+  interval_in_seconds = 15
+  number_of_probes    = 2
+}
+
+# Load Balancing Rule
+resource "azurerm_lb_rule" "http" {
+  loadbalancer_id                = azurerm_lb.main.id
+  name                           = "http-rule"
+  protocol                       = "Tcp"
+  frontend_port                  = 80
+  backend_port                   = 80
+  frontend_ip_configuration_name = "PublicIPAddress"
+  backend_address_pool_ids       = [azurerm_lb_backend_address_pool.main.id]
+  probe_id                       = azurerm_lb_probe.http.id
+  load_distribution              = "SourceIP"
+  idle_timeout_in_minutes        = 15
+  enable_tcp_reset               = true
+}
+
+# NAT Rule pour SSH
+resource "azurerm_lb_nat_rule" "ssh" {
+  resource_group_name            = azurerm_resource_group.main.name
+  loadbalancer_id                = azurerm_lb.main.id
+  name                           = "ssh-vm1"
+  protocol                       = "Tcp"
+  frontend_port                  = 2221
+  backend_port                   = 22
+  frontend_ip_configuration_name = "PublicIPAddress"
+}
+```
+
+**B. Application Gateway v2 avec WAF**
+```hcl
+# Public IP
+resource "azurerm_public_ip" "appgw" {
+  name                = "appgw-public-ip"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
+# Application Gateway
+resource "azurerm_application_gateway" "main" {
+  name                = "main-appgateway"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+
+  sku {
+    name     = "WAF_v2"
+    tier     = "WAF_v2"
+  }
+
+  autoscale_configuration {
+    min_capacity = 2
+    max_capacity = 10
+  }
+
+  gateway_ip_configuration {
+    name      = "gateway-ip-config"
+    subnet_id = azurerm_subnet.appgw.id
+  }
+
+  frontend_port {
+    name = "https-port"
+    port = 443
+  }
+
+  frontend_port {
+    name = "http-port"
+    port = 80
+  }
+
+  frontend_ip_configuration {
+    name                 = "frontend-ip"
+    public_ip_address_id = azurerm_public_ip.appgw.id
+  }
+
+  backend_address_pool {
+    name = "api-backend-pool"
+  }
+
+  backend_address_pool {
+    name = "web-backend-pool"
+  }
+
+  backend_http_settings {
+    name                  = "https-settings"
+    cookie_based_affinity = "Enabled"
+    port                  = 443
+    protocol              = "Https"
+    request_timeout       = 30
+    probe_name            = "api-probe"
+    
+    connection_draining {
+      enabled           = true
+      drain_timeout_sec = 60
+    }
+  }
+
+  http_listener {
+    name                           = "https-listener"
+    frontend_ip_configuration_name = "frontend-ip"
+    frontend_port_name             = "https-port"
+    protocol                       = "Https"
+    ssl_certificate_name           = "ssl-cert"
+    host_name                      = "api.contoso.com"
+  }
+
+  # URL Path Map pour microservices
+  url_path_map {
+    name                               = "api-path-map"
+    default_backend_address_pool_name  = "web-backend-pool"
+    default_backend_http_settings_name = "https-settings"
+
+    path_rule {
+      name                       = "api-rule"
+      paths                      = ["/api/*"]
+      backend_address_pool_name  = "api-backend-pool"
+      backend_http_settings_name = "https-settings"
+    }
+  }
+
+  request_routing_rule {
+    name                       = "api-routing-rule"
+    rule_type                  = "PathBasedRouting"
+    http_listener_name         = "https-listener"
+    url_path_map_name          = "api-path-map"
+    priority                   = 100
+  }
+
+  ssl_certificate {
+    name     = "ssl-cert"
+    data     = filebase64("certificate.pfx")
+    password = var.ssl_password
+  }
+
+  ssl_policy {
+    policy_type = "Predefined"
+    policy_name = "AppGwSslPolicy20220101"
+  }
+
+  # Health Probe
+  probe {
+    name                = "api-probe"
+    protocol            = "Https"
+    path                = "/api/health"
+    interval            = 30
+    timeout             = 30
+    unhealthy_threshold = 3
+    host                = "api.contoso.com"
+    
+    match {
+      status_code = ["200-399"]
+    }
+  }
+
+  # WAF Configuration
+  waf_configuration {
+    enabled          = true
+    firewall_mode    = "Prevention"
+    rule_set_type    = "OWASP"
+    rule_set_version = "3.2"
+  }
+
+  # Rewrite rules pour headers de sécurité
+  rewrite_rule_set {
+    name = "security-headers"
+    
+    rewrite_rule {
+      name          = "add-hsts"
+      rule_sequence = 100
+      
+      response_header_configuration {
+        header_name  = "Strict-Transport-Security"
+        header_value = "max-age=31536000; includeSubDomains"
+      }
+    }
+
+    rewrite_rule {
+      name          = "remove-server-header"
+      rule_sequence = 200
+      
+      response_header_configuration {
+        header_name  = "Server"
+        header_value = ""
+      }
+    }
+  }
+
+  tags = {
+    Environment = "Production"
+    ManagedBy   = "Terraform"
+  }
+}
+```
+
+**C. Monitoring avec Azure Monitor - Terraform**
+```hcl
+# Log Analytics Workspace
+resource "azurerm_log_analytics_workspace" "main" {
+  name                = "lb-logs"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+# Diagnostic Settings pour Load Balancer
+resource "azurerm_monitor_diagnostic_setting" "lb" {
+  name                       = "lb-diagnostics"
+  target_resource_id         = azurerm_lb.main.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category = "LoadBalancerAlertEvent"
+  }
+
+  enabled_log {
+    category = "LoadBalancerProbeHealthStatus"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+
+# Diagnostic Settings pour Application Gateway
+resource "azurerm_monitor_diagnostic_setting" "appgw" {
+  name                       = "appgw-diagnostics"
+  target_resource_id         = azurerm_application_gateway.main.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category = "ApplicationGatewayAccessLog"
+  }
+
+  enabled_log {
+    category = "ApplicationGatewayPerformanceLog"
+  }
+
+  enabled_log {
+    category = "ApplicationGatewayFirewallLog"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+
+# Alert pour Load Balancer unhealthy
+resource "azurerm_monitor_metric_alert" "lb_unhealthy" {
+  name                = "lb-unhealthy-backends"
+  resource_group_name = azurerm_resource_group.main.name
+  scopes              = [azurerm_lb.main.id]
+  description         = "Alert when backend health drops"
+  severity            = 2
+  frequency           = "PT1M"
+  window_size         = "PT5M"
+
+  criteria {
+    metric_namespace = "Microsoft.Network/loadBalancers"
+    metric_name      = "DipAvailability"
+    aggregation      = "Average"
+    operator         = "LessThan"
+    threshold        = 50
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.main.id
+  }
+}
+
+# Alert pour Application Gateway failed requests
+resource "azurerm_monitor_metric_alert" "appgw_failed" {
+  name                = "appgw-failed-requests"
+  resource_group_name = azurerm_resource_group.main.name
+  scopes              = [azurerm_application_gateway.main.id]
+  description         = "Alert when failed requests exceed threshold"
+  severity            = 1
+  frequency           = "PT1M"
+  window_size         = "PT5M"
+
+  criteria {
+    metric_namespace = "Microsoft.Network/applicationGateways"
+    metric_name      = "FailedRequests"
+    aggregation      = "Total"
+    operator         = "GreaterThan"
+    threshold        = 100
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.main.id
+  }
+}
+```
+
+**14. Best Practices DevOps - Checklist de Production**
+
+**Load Balancer :**
+- ✅ **Toujours utiliser Standard SKU** (Basic deprecated)
+- ✅ **Configurer health probes avec endpoints dédiés** `/health` ou `/healthz`
+- ✅ **Utiliser zones de disponibilité** pour HA multi-datacenter
+- ✅ **Activer TCP Reset** pour connexions stale
+- ✅ **Monitorer DipAvailability metric** (santé des backends)
+- ✅ **Configurer NSG pour autoriser AzureLoadBalancer tag**
+- ✅ **Utiliser NAT Gateway pour outbound** (pas outbound rules LB)
+- ✅ **Session persistence selon besoin applicatif** (stateful vs stateless)
+- ✅ **Logs diagnostiques vers Log Analytics**
+- ✅ **Alerts sur health probe failures**
+
+**Application Gateway :**
+- ✅ **Toujours déployer v2** (v1 legacy)
+- ✅ **Activer autoscaling** min=2, max=10+
+- ✅ **WAF en mode Prevention** pour production
+- ✅ **End-to-end SSL** pour données sensibles
+- ✅ **TLS 1.2+ uniquement** (désactiver TLS 1.0/1.1)
+- ✅ **Health probes custom** avec vérifications applicatives
+- ✅ **Connection draining** activé (60s minimum)
+- ✅ **Rewrite rules** pour headers de sécurité (HSTS, X-Frame-Options)
+- ✅ **Dedicated subnet** /24 minimum pour App Gateway
+- ✅ **Custom error pages** pour meilleure UX
+- ✅ **Logs vers SIEM** (Sentinel, Splunk)
+- ✅ **Monitor Capacity Units** pour coûts
+- ✅ **Alerts sur 5xx errors** et latence
+
+**Sécurité :**
+- ✅ **NSG sur subnet Application Gateway**
+- ✅ **WAF custom rules** pour votre application
+- ✅ **Rate limiting** pour DDoS protection
+- ✅ **IP whitelisting** si applicable
+- ✅ **Certificates dans Key Vault** (pas dans code)
+- ✅ **Rotation automatique certificats**
+- ✅ **RBAC strict** sur ressources load balancing
+
+**Monitoring et Alerting :**
+- ✅ **Dashboard Azure Monitor** avec métriques clés
+- ✅ **Alerts sur santé backends**
+- ✅ **Alerts sur latence élevée**
+- ✅ **Alerts sur erreurs 5xx**
+- ✅ **Workbooks pour analyse trafic**
+- ✅ **Integration avec outils DevOps** (PagerDuty, Slack)
+
+**15. Troubleshooting Avancé - Playbook DevOps**
+
+**Problème : Backends marqués unhealthy**
+```bash
+# 1. Vérifier status health probes
+az network lb show --name myLB --resource-group myRG \
+  --query "probes[].{Name:name,Protocol:protocol,Port:port,Path:requestPath}"
+
+# 2. Tester manuellement l'endpoint
+curl -v http://10.0.1.4/health
+
+# 3. Vérifier NSG rules
+az network nsg show --name myNSG --resource-group myRG \
+  --query "securityRules[?destinationPortRange=='80']"
+
+# 4. Vérifier depuis la VM que le service écoute
+ssh user@vm1
+netstat -tlnp | grep :80
+
+# 5. Vérifier logs applicatifs
+tail -f /var/log/app/error.log
+```
+
+**Problème : Application Gateway erreurs 502**
+```bash
+# 1. Vérifier backend health
+az network application-gateway show-backend-health \
+  --name myAppGateway \
+  --resource-group myRG
+
+# 2. Analyser logs
+az monitor log-analytics query \
+  --workspace myWorkspace \
+  --analytics-query "
+    AzureDiagnostics
+    | where ResourceType == 'APPLICATIONGATEWAYS'
+    | where httpStatus_d == 502
+    | project TimeGenerated, requestUri_s, backendSettingName_s
+    | take 50"
+
+# 3. Vérifier timeout settings
+az network application-gateway http-settings show \
+  --gateway-name myAppGateway \
+  --resource-group myRG \
+  --name myHTTPSettings \
+  --query "requestTimeout"
+
+# 4. Tester backend directement
+curl -H "Host: api.contoso.com" http://10.0.1.4/api/endpoint
+```
+
+**Problème : Performance dégradée**
+```bash
+# Load Balancer - Vérifier SNAT port exhaustion
+az monitor metrics list \
+  --resource myLB \
+  --metric "UsedSNATPorts" \
+  --resource-type Microsoft.Network/loadBalancers
+
+# Application Gateway - Vérifier capacity units
+az monitor metrics list \
+  --resource myAppGateway \
+  --metric "CurrentCapacityUnits" \
+  --resource-type Microsoft.Network/applicationGateways
+
+# Latency analysis
+az monitor metrics list \
+  --resource myAppGateway \
+  --metric "ApplicationGatewayTotalTime,BackendResponseTime"
+```
+
+**16. Coûts et Optimisation**
+
+**Load Balancer Standard - Calcul Coûts**
+```
+Coût mensuel = Base fee + Data processed
+
+Base fee: ~$18/mois
+Data processed: $0.005/GB
+
+Exemple :
+- 1TB trafic/mois = 1000 GB × $0.005 = $5
+- Total: $18 + $5 = $23/mois
+```
+
+**Application Gateway v2 - Calcul Coûts**
+```
+Coût mensuel = Fixed capacity units + Variable capacity units + Data processed
+
+Fixed (2 CU): ~$145/mois
+Variable CU: $0.008/CU-hour
+Data processed: $0.008/GB
+
+Exemple avec autoscaling 2-5 CU:
+- Base (2 CU): $145
+- Variable (3 CU × 730h × $0.008): $17.52
+- Data (500 GB × $0.008): $4
+- Total: ~$167/mois
+```
+
+**Optimisation Coûts :**
+- **Load Balancer** : Moins cher pour TCP/UDP simple
+- **App Gateway v2** : Autoscaling évite surprovisionnement
+- **Zones de disponibilité** : Pas de coût supplémentaire (sauf data transfer)
+- **WAF** : +30-40% coût vs Standard (évaluer nécessité)
 
 #### Comparaison Détaillée : Azure Load Balancer vs Application Gateway
 
