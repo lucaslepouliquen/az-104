@@ -493,6 +493,317 @@ Root Management Group
 - **Performance** : Premium uniquement pour Blobs et Files
 - **Réplication** : Tous supportent LRS, certains limités pour ZRS/GRS
 
+#### Blob Access Tiers - Optimisation des Coûts
+
+**⚠️ Erreur Courante QCM : Choisir le bon tier selon le pattern d'accès**
+
+**Vue d'ensemble :**
+Les Access Tiers permettent d'optimiser les coûts de stockage en fonction de la fréquence d'accès aux données.
+
+**Comparaison Complète des Tiers :**
+
+| Tier | Use Case | Disponibilité | Coût Stockage | Coût Accès | Latence | Durée min | Suppression anticipée |
+|------|----------|--------------|---------------|------------|---------|-----------|----------------------|
+| **Hot** | Données fréquemment accédées | Immédiate | $$$ Élevé | $ Faible | Ms | Aucune | Non |
+| **Cool** | Données peu accédées (>30 jours) | Immédiate | $$ Moyen | $$ Moyen | Ms | 30 jours | Oui |
+| **Cold** | Données rarement accédées (>90 jours) | Immédiate | $ Faible | $$$ Élevé | Ms | 90 jours | Oui |
+| **Archive** | Archivage long terme (>180 jours) | Après réhydratation | $ Très faible | $$$$ Très élevé | Heures | 180 jours | Oui |
+
+**1. Hot Tier - Données Actives**
+
+**Caractéristiques :**
+- **Pattern d'accès** : Données accédées fréquemment (quotidiennement)
+- **Coût stockage** : ~$0.018/GB/mois (le plus élevé)
+- **Coût accès** : ~$0.0004/10,000 read operations (le plus faible)
+- **SLA** : Identique aux autres tiers (99.9% pour LRS)
+- **Latence** : Millisecondes
+
+**Use Cases :**
+- Sites web actifs (images, CSS, JS)
+- Données applicatives en production
+- Fichiers logs actifs
+- Bases de données actives
+- Contenu média streaming
+
+**Configuration :**
+```bash
+# Set default tier à Hot lors de la création
+az storage account create \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --location eastus \
+  --sku Standard_LRS \
+  --access-tier Hot
+
+# Changer le tier par défaut d'un compte existant
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --access-tier Hot
+```
+
+**2. Cool Tier - Données Occasionnelles**
+
+**Caractéristiques :**
+- **Pattern d'accès** : Données accédées occasionnellement (1x/mois minimum)
+- **Coût stockage** : ~$0.010/GB/mois (45% moins cher que Hot)
+- **Coût accès** : ~$0.01/10,000 read operations (25x plus cher que Hot)
+- **Durée minimum** : 30 jours (facturation complète même si supprimé avant)
+- **Pénalité** : Si supprimé avant 30 jours, facturation du reste de la période
+
+**Use Cases :**
+- Backups court terme (30-90 jours)
+- Données de compliance
+- Fichiers logs anciens mais accessibles
+- Archives à court terme
+- Données de développement/test
+
+**Configuration :**
+```bash
+# Définir Cool tier comme défaut
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --access-tier Cool
+
+# Changer un blob spécifique vers Cool
+az storage blob set-tier \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --tier Cool
+```
+
+**3. Cold Tier - Données Rarement Accédées (Nouveau en 2024)**
+
+**Caractéristiques :**
+- **Pattern d'accès** : Données rarement accédées (quelques fois/an)
+- **Coût stockage** : ~$0.005/GB/mois (72% moins cher que Hot)
+- **Coût accès** : Plus élevé que Cool
+- **Durée minimum** : 90 jours
+- **Disponibilité** : Immédiate (pas de réhydratation)
+
+**Use Cases :**
+- Backups moyen terme (90-180 jours)
+- Archives réglementaires accessibles
+- Données forensiques
+- Logs long terme avec accès occasionnel
+
+**4. Archive Tier - Archivage Long Terme**
+
+**Caractéristiques :**
+- **Pattern d'accès** : Très rarement accédé (plusieurs mois/années)
+- **Coût stockage** : ~$0.002/GB/mois (91% moins cher que Hot)
+- **Coût accès** : Très élevé + coût de réhydratation
+- **Durée minimum** : 180 jours
+- **Latence** : Heures (réhydratation requise)
+- **Offline** : Blob doit être réhydraté avant lecture
+
+**⚠️ POINT CRITIQUE pour l'examen :**
+Les blobs en Archive tier sont **OFFLINE** et doivent être réhydratés avant accès.
+
+**Réhydratation (2 options) :**
+
+**A. Standard Rehydration (Économique)**
+- **Durée** : Jusqu'à 15 heures
+- **Coût** : Standard
+- **Use case** : Accès non urgent
+
+```bash
+# Réhydratation Standard vers Hot
+az storage blob set-tier \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name archivedblob.txt \
+  --tier Hot \
+  --rehydrate-priority Standard
+```
+
+**B. High Priority Rehydration (Rapide)**
+- **Durée** : Moins de 1 heure (généralement 30 min pour <10GB)
+- **Coût** : ~10x plus cher que Standard
+- **Use case** : Accès urgent
+
+```bash
+# Réhydratation High Priority vers Hot
+az storage blob set-tier \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name archivedblob.txt \
+  --tier Hot \
+  --rehydrate-priority High
+```
+
+**Copy Rehydration (Alternative) :**
+```bash
+# Copier vers un nouveau blob (garde l'original en Archive)
+az storage blob copy start \
+  --account-name mystorageaccount \
+  --destination-container mycontainer \
+  --destination-blob rehydrated-blob.txt \
+  --source-uri https://mystorageaccount.blob.core.windows.net/mycontainer/archivedblob.txt \
+  --tier Hot \
+  --rehydrate-priority High
+```
+
+**Use Cases Archive :**
+- Compliance long terme (7-10 ans)
+- Archives légales
+- Backups annuels
+- Données historiques
+- Forensics cold case
+
+**Lifecycle Management - Automatisation des Transitions**
+
+**⚠️ Feature Clé pour l'AZ-104**
+
+**Vue d'ensemble :**
+Lifecycle Management permet d'automatiser les transitions de tiers et la suppression de blobs selon des règles définies.
+
+**Configuration via Azure CLI :**
+```bash
+# Créer une politique de lifecycle
+az storage account management-policy create \
+  --account-name mystorageaccount \
+  --resource-group myRG \
+  --policy @policy.json
+```
+
+**Exemple de Politique Complète (policy.json) :**
+```json
+{
+  "rules": [
+    {
+      "name": "MoveToArchive",
+      "enabled": true,
+      "type": "Lifecycle",
+      "definition": {
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["backups/"]
+        },
+        "actions": {
+          "baseBlob": {
+            "tierToCool": {
+              "daysAfterModificationGreaterThan": 30
+            },
+            "tierToArchive": {
+              "daysAfterModificationGreaterThan": 180
+            },
+            "delete": {
+              "daysAfterModificationGreaterThan": 2555
+            }
+          },
+          "snapshot": {
+            "tierToCool": {
+              "daysAfterCreationGreaterThan": 90
+            },
+            "delete": {
+              "daysAfterCreationGreaterThan": 365
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "DeleteOldLogs",
+      "enabled": true,
+      "type": "Lifecycle",
+      "definition": {
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["logs/"]
+        },
+        "actions": {
+          "baseBlob": {
+            "tierToCool": {
+              "daysAfterModificationGreaterThan": 7
+            },
+            "tierToArchive": {
+              "daysAfterModificationGreaterThan": 90
+            },
+            "delete": {
+              "daysAfterModificationGreaterThan": 365
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+**Actions Disponibles :**
+
+| Action | Description | Use Case |
+|--------|-------------|----------|
+| **tierToCool** | Déplacer vers Cool | Données peu accédées |
+| **tierToCold** | Déplacer vers Cold (2024) | Données rarement accédées |
+| **tierToArchive** | Déplacer vers Archive | Archivage long terme |
+| **delete** | Supprimer le blob | Nettoyage automatique |
+| **enableAutoTierToHotFromCool** | Réhydrater automatiquement si accédé | Optimisation coûts |
+
+**Filtres Disponibles :**
+- **blobTypes** : blockBlob, appendBlob, pageBlob
+- **prefixMatch** : Filtrer par préfixe (ex: "backups/", "logs/2024/")
+- **blobIndexMatch** : Filtrer par tags de métadonnées
+
+**PowerShell - Lifecycle Management :**
+```powershell
+# Créer règle de lifecycle
+$action = New-AzStorageAccountManagementPolicyAction -BaseBlobAction TierToCool `
+  -DaysAfterModificationGreaterThan 30
+$filter = New-AzStorageAccountManagementPolicyFilter -PrefixMatch "backups/"
+$rule = New-AzStorageAccountManagementPolicyRule -Name "MoveToArchive" `
+  -Action $action -Filter $filter
+$policy = Set-AzStorageAccountManagementPolicy `
+  -ResourceGroupName "myRG" `
+  -AccountName "mystorageaccount" `
+  -Rule $rule
+```
+
+**Scénarios d'Examen - Access Tiers**
+
+| Scénario | Solution | Raison |
+|----------|----------|--------|
+| **Site web avec 10,000 visiteurs/jour** | **Hot tier** | Accès fréquent, coût accès faible critique |
+| **Backups mensuels accessibles** | **Cool tier** | Accès occasionnel, durée min 30 jours OK |
+| **Archives conformité 7 ans** | **Archive tier** | Accès très rare, coût stockage minimal |
+| **Logs applicatifs (30 jours actifs)** | **Hot → Cool (lifecycle)** | Transition automatique après 30 jours |
+| **Données dev/test** | **Cool tier** | Accès intermittent, économie 45% |
+| **Recovery point long terme** | **Archive tier** | Restauration rare, réhydratation acceptable |
+
+**Matrice de Décision - Calcul de Coût**
+
+**Exemple : 1TB de données pendant 1 an**
+
+| Tier | Stockage/mois | Accès (100 read/mois) | Total/an | Économie vs Hot |
+|------|---------------|----------------------|----------|-----------------|
+| **Hot** | $18 | $0.04 | $216.48 | - |
+| **Cool** | $10 | $1.00 | $132.00 | 39% |
+| **Cold** | $5 | $2.00 | $84.00 | 61% |
+| **Archive** | $2 | $10.00 + réhydratation | $144.00* | 33% |
+
+*Archive moins avantageux si accès fréquent
+
+**Best Practices - Access Tiers**
+
+✅ **À FAIRE :**
+- **Lifecycle policies** pour toutes données avec cycle de vie prévisible
+- **Hot tier** pour données production accédées quotidiennement
+- **Cool tier** pour backups 30-90 jours
+- **Archive tier** pour compliance >180 jours
+- **Prefixes** pour faciliter les règles de lifecycle (`/hot/`, `/cool/`, `/archive/`)
+- **Monitoring** des coûts par tier (Cost Management)
+- **Test réhydratation** avant archivage critique
+
+❌ **À ÉVITER :**
+- Archive tier pour données nécessitant accès rapide (15h réhydratation)
+- Hot tier pour données rarement accédées (gaspillage)
+- Suppression avant durée minimum (pénalités)
+- Lifecycle sans préfixes (règles trop larges)
+- Oublier coûts d'accès (peut dépasser économies de stockage)
+
 #### Niveaux d'accès (Blob Storage)
 - **Hot** : Accès fréquent, coût stockage élevé, coût accès faible
 - **Cool** : Accès occasionnel (30 jours minimum), coût moyen
@@ -1789,12 +2100,222 @@ az vm create \
 
 ### 3.3 App Services
 
-#### Service Plans
-- **Shared** : F1 (Free), D1 (Shared) - Limitations CPU
-- **Basic** : B1, B2, B3 - Applications simples
-- **Standard** : S1, S2, S3 - Applications production
-- **Premium** : P1, P2, P3 - Applications critiques
-- **Isolated** : I1, I2, I3 - Environnements dédiés
+#### Service Plans - Tiers Détaillés
+
+**⚠️ Erreur Courante QCM : Capacités de scaling par tier**
+
+**Comparaison Complète des Tiers :**
+
+| Tier | SKUs | Max Instances | Autoscale | Deployment Slots | Custom Domain | SSL | Prix/mois |
+|------|------|---------------|-----------|------------------|---------------|-----|-----------|
+| **Free** | F1 | 1 (partagé) | ❌ Non | ❌ Non | ❌ Non | ❌ Non | Gratuit |
+| **Shared** | D1 | 1 (partagé) | ❌ Non | ❌ Non | ✅ Oui | ❌ Non | ~$10 |
+| **Basic** | B1-B3 | 3 | ❌ Non | ❌ Non | ✅ Oui | ✅ Oui | ~$55-220 |
+| **Standard** | S1-S3 | 10 | ✅ Oui | ✅ 5 slots | ✅ Oui | ✅ Oui | ~$70-280 |
+| **Premium** | P1v2-P3v2 | 30 | ✅ Oui | ✅ 20 slots | ✅ Oui | ✅ Oui | ~$150-600 |
+| **PremiumV3** | P1v3-P3v3 | 30 | ✅ Oui | ✅ 20 slots | ✅ Oui | ✅ Oui | ~$200-800 |
+| **Isolated** | I1-I3 | 100 | ✅ Oui | ✅ 20 slots | ✅ Oui | ✅ Oui | ~$650+ |
+
+**Caractéristiques par Tier :**
+
+**Free / Shared (Development) :**
+- **Infrastructure** : Partagée avec autres clients
+- **Limitations** : Quotas CPU (60 min/jour pour Free)
+- **Downtime** : Possible si app inactive > 20 min
+- **Use case** : Développement, POC uniquement
+- ❌ **Production** : Non recommandé
+
+**Basic (Small Production) :**
+- **Infrastructure** : VMs dédiées
+- **Scaling** : Manuel uniquement (1-3 instances)
+- **Limitations** : Pas d'autoscale, pas de slots
+- **Use case** : Petites apps production, budget limité
+- **SLA** : 99.95%
+
+**Standard (Production) :**
+- **Infrastructure** : VMs dédiées
+- **Scaling** : Manuel + Autoscale (1-10 instances)
+- **Features** : Deployment slots (5), Traffic Manager
+- **Use case** : Apps production standard
+- **SLA** : 99.95%
+
+**Premium (High Performance) :**
+- **Infrastructure** : VMs dédiées plus puissantes
+- **Scaling** : Manuel + Autoscale (1-30 instances)
+- **Features** : Deployment slots (20), VNet integration
+- **Use case** : Apps critiques, haute performance
+- **SLA** : 99.95%
+
+**Isolated (Enterprise) :**
+- **Infrastructure** : App Service Environment (ASE) dédié
+- **Isolation** : Réseau isolé, pas de partage
+- **Scaling** : Jusqu'à 100 instances
+- **Use case** : Conformité, sécurité maximale
+- **SLA** : 99.95%
+
+#### App Service Plan Scaling - Détaillé
+
+**⚠️ Erreur Courante QCM : Scale Up vs Scale Out**
+
+**Types de Scaling Disponibles :**
+
+**1. Scale Up (Vertical Scaling) - Changer de Tier/SKU**
+
+**Définition :** Augmenter les ressources (CPU, RAM, Storage) de chaque instance
+
+**Quand utiliser :**
+- Application nécessite plus de CPU/RAM
+- Atteinte des limites de l'instance actuelle
+- Besoin de nouvelles fonctionnalités (ex: deployment slots)
+
+**Exemple - Azure CLI :**
+```bash
+# Upgrader de B1 vers S1
+az appservice plan update \
+  --name myAppServicePlan \
+  --resource-group myRG \
+  --sku S1
+
+# Upgrader vers Premium
+az appservice plan update \
+  --name myAppServicePlan \
+  --resource-group myRG \
+  --sku P1V2
+```
+
+**Impact :**
+- ⏱️ **Downtime** : Bref redémarrage (quelques secondes)
+- 💰 **Coût** : Augmente selon le nouveau tier
+- 🎯 **Performance** : Chaque instance plus puissante
+
+**2. Scale Out (Horizontal Scaling) - Ajouter des Instances**
+
+**Définition :** Augmenter le nombre d'instances (VMs) qui exécutent l'application
+
+**Quand utiliser :**
+- Trafic élevé, besoin de plus de capacité
+- Haute disponibilité requise
+- Distribution de charge
+
+**Exemple - Azure CLI :**
+```bash
+# Scale Out manuel - Ajouter 5 instances
+az appservice plan update \
+  --name myAppServicePlan \
+  --resource-group myRG \
+  --number-of-workers 5
+```
+
+**Impact :**
+- ⏱️ **Downtime** : ✅ Aucun
+- 💰 **Coût** : Proportionnel au nombre d'instances
+- 🎯 **Performance** : Capacité totale multipliée
+
+**3. Autoscale (Automatic Horizontal Scaling)**
+
+**Disponible à partir de :** Standard (S1) et supérieur
+
+**Configuration Autoscale :**
+```bash
+# Créer une règle d'autoscale
+az monitor autoscale create \
+  --resource-group myRG \
+  --resource myAppServicePlan \
+  --resource-type Microsoft.Web/serverFarms \
+  --name myAutoscaleRule \
+  --min-count 2 \
+  --max-count 10 \
+  --count 2
+
+# Règle basée sur CPU (Scale Out)
+az monitor autoscale rule create \
+  --resource-group myRG \
+  --autoscale-name myAutoscaleRule \
+  --condition "CpuPercentage > 75 avg 5m" \
+  --scale out 1
+
+# Règle basée sur CPU (Scale In)
+az monitor autoscale rule create \
+  --resource-group myRG \
+  --autoscale-name myAutoscaleRule \
+  --condition "CpuPercentage < 25 avg 5m" \
+  --scale in 1
+```
+
+**Métriques disponibles pour Autoscale :**
+- **CPU Percentage** : % utilisation CPU
+- **Memory Percentage** : % utilisation RAM
+- **Disk Queue Length** : File d'attente disque
+- **Http Queue Length** : File d'attente requêtes HTTP
+- **Data In/Out** : Bande passante réseau
+- **Custom metrics** : Application Insights
+
+**Configuration via Portal :**
+```
+App Service Plan → Scale out (App Service plan) → Autoscale
+→ Add a rule → Metric (CPU Percentage > 70)
+→ Operation (Increase count by 1)
+→ Cool down (5 minutes)
+```
+
+**Best Practices Autoscale :**
+- ✅ **Minimum 2 instances** pour haute disponibilité
+- ✅ **Cool down period** : 5-10 minutes (éviter flapping)
+- ✅ **Margins** : Scale out à 70%, scale in à 30%
+- ⚠️ **Limites** : Définir max instances pour contrôler coûts
+
+**Matrice de Décision - Scaling :**
+
+| Symptôme | Solution | Commande |
+|----------|----------|----------|
+| **CPU/RAM saturé** sur instances | Scale Up | Change SKU (B1→S1) |
+| **Trafic élevé**, instances saturées | Scale Out | Augmenter instances |
+| **Trafic variable** (pics) | Autoscale | Règles basées métriques |
+| **Besoin de deployment slots** | Scale Up | Upgrade vers S1+ |
+| **Latence élevée** | Scale Out | Plus d'instances |
+| **Coûts trop élevés** | Scale Down/In | Réduire tier ou instances |
+
+**Limitations par Tier :**
+
+| Tier | Scale Out Manuel | Autoscale | Max Instances |
+|------|-----------------|-----------|---------------|
+| Free/Shared | ❌ Non | ❌ Non | 1 (partagé) |
+| Basic | ✅ Oui | ❌ Non | 3 |
+| Standard | ✅ Oui | ✅ Oui | 10 |
+| Premium | ✅ Oui | ✅ Oui | 30 |
+| Isolated | ✅ Oui | ✅ Oui | 100 |
+
+**Scénarios d'Examen :**
+
+| Question | Réponse | Raison |
+|----------|---------|--------|
+| App nécessite plus de RAM | **Scale Up** | Augmenter ressources par instance |
+| Trafic web élevé, pic de charge | **Scale Out** | Ajouter instances pour capacité |
+| Besoin deployment slots | **Scale Up to Standard** | Slots disponibles à partir de S1 |
+| Trafic variable jour/nuit | **Autoscale** | Ajustement automatique |
+| Minimiser downtime pendant scaling | **Scale Out** | Pas de redémarrage |
+
+**PowerShell - Gestion Complète :**
+```powershell
+# Scale Up
+Set-AzAppServicePlan `
+  -ResourceGroupName "myRG" `
+  -Name "myAppServicePlan" `
+  -Tier "Standard" `
+  -WorkerSize "Medium"
+
+# Scale Out
+Set-AzAppServicePlan `
+  -ResourceGroupName "myRG" `
+  -Name "myAppServicePlan" `
+  -NumberofWorkers 5
+
+# Get current scale
+Get-AzAppServicePlan `
+  -ResourceGroupName "myRG" `
+  -Name "myAppServicePlan" | 
+  Select-Object Name, Sku, NumberOfWorkers
+```
 
 #### Runtime Stacks et OS
 ** Point clé identifié :** Un App Service = Un runtime
@@ -1865,31 +2386,256 @@ az vm create \
 - **Subnets** : Subdivision du VNet
 - **Network Security Groups** : Firewalls au niveau subnet/NIC
 
-#### VNet Peering
+#### VNet Peering - Configuration Détaillée
+
+**⚠️ Erreur Courante QCM : Configuration bidirectionnelle obligatoire**
+
+**Vue d'ensemble :**
+VNet Peering établit une connexion privée entre deux réseaux virtuels Azure, permettant aux ressources de communiquer comme si elles étaient sur le même réseau.
 
 **Types de Peering :**
-- **Regional** : VNets dans la même région
-- **Global** : VNets dans différentes régions
-- **Traffic** : Privé, pas d'Internet, faible latence
-- **Billing** : Facturation du trafic cross-region
 
-**Tips critiques identifiés :**
+| Type | Portée | Latence | Coût | Use Case |
+|------|--------|---------|------|----------|
+| **Regional VNet Peering** | Même région Azure | Ultra-faible | Gratuit (ingress) | Apps multi-tier, partage de ressources |
+| **Global VNet Peering** | Régions différentes | Faible | Facturé (ingress + egress) | Multi-région, DR, geo-distribution |
+
+**Caractéristiques Clés :**
+- **Traffic** : 100% privé, transit par backbone Azure (pas d'Internet)
+- **Bande passante** : Identique à celle d'un VNet unique
+- **Latence** : Minimale, équivalente à un VNet local
+- **Sécurité** : Trafic chiffré par défaut sur le réseau Azure
+- **Gateway Transit** : Partage de VPN/ExpressRoute Gateways possible
+
+**Configuration Obligatoire - Bidirectionnelle**
+
+**⚠️ POINT CRITIQUE pour l'EXAMEN :**
+- **Peering = 2 opérations distinctes**
+- VNet1 → VNet2 (créer peering depuis VNet1)
+- VNet2 → VNet1 (créer peering depuis VNet2)
+- **Les deux doivent être configurés** pour établir la communication
+
+**Visualisation :**
+```
+VNet1 (10.0.0.0/16)          VNet2 (172.16.0.0/16)
+       │                              │
+       │ ─────── Peering 1 ────────→ │
+       │                              │
+       │ ←────── Peering 2 ───────── │
+       │                              │
+    ✅ Communication établie
+```
+
+**Sans configuration bidirectionnelle :**
+```
+VNet1 (10.0.0.0/16)          VNet2 (172.16.0.0/16)
+       │                              │
+       │ ─────── Peering 1 ────────→ │
+       │                              │
+       │         (pas de retour)      │
+       │                              │
+    ❌ Communication IMPOSSIBLE
+```
 
 **1. Règle d'Or : Plages d'adresses non-chevauchantes**
-- **Principe** : Deux VNets ne peuvent être peerés que si leurs plages d'adresses ne se chevauchent pas
-- **Exemple critique** : VNet1 (192.168.0.0/24) ne peut PAS être peeré avec VNet3 (192.168.0.0/16)
-- **Raison** : /24 est inclus dans /16 → chevauchement détecté
-- **Solution** : Utiliser des plages complètement différentes (ex: 10.0.0.0/16 vs 172.16.0.0/16)
 
-**2. Performance et Latence**
-- **Avantage clé** : Communication avec la même latence et bande passante que si les ressources étaient sur le même VNet
-- **Trafic privé** : Pas de transit par Internet, sécurité renforcée
-- **Optimisation** : Idéal pour architectures distribuées (prod/dev, multi-régions)
+**⚠️ Prérequis OBLIGATOIRE :**
+- **Principe** : Les plages d'adresses (CIDR) des deux VNets ne peuvent PAS se chevaucher
+- **Vérification Azure** : Azure refuse automatiquement le peering si chevauchement détecté
 
-**3. Configuration dans le Portail Azure**
-- **Navigation** : VNet → Peerings → Add peering
-- **Bidirectionnel** : Créer le peering dans les deux sens
-- **Validation** : Azure vérifie automatiquement la compatibilité des plages
+**Exemples de Compatibilité :**
+
+| VNet1 Address Space | VNet2 Address Space | Peering Possible ? | Raison |
+|---------------------|---------------------|-------------------|--------|
+| 10.0.0.0/16 | 172.16.0.0/16 | ✅ **OUI** | Plages complètement différentes |
+| 10.0.0.0/16 | 10.1.0.0/16 | ✅ **OUI** | Pas de chevauchement |
+| 192.168.0.0/24 | 192.168.1.0/24 | ✅ **OUI** | Sous-réseaux différents |
+| 192.168.0.0/24 | 192.168.0.0/16 | ❌ **NON** | /24 inclus dans /16 |
+| 10.0.0.0/16 | 10.0.0.0/24 | ❌ **NON** | /24 inclus dans /16 |
+| 172.16.0.0/16 | 172.16.0.0/12 | ❌ **NON** | /16 inclus dans /12 |
+
+**Erreur Fréquente en Examen :**
+- **Question** : VNet1 (192.168.0.0/24) peut-il être peeré avec VNet3 (192.168.0.0/16) ?
+- **Réponse correcte** : ❌ **NON**
+- **Raison** : La plage 192.168.0.0/24 est **entièrement incluse** dans 192.168.0.0/16
+- **Solution** : Utiliser des plages complètement distinctes (ex: 10.0.0.0/16 et 172.16.0.0/16)
+
+**2. Configuration via Azure CLI - Étape par Étape**
+
+**Étape 1 : Obtenir les Resource IDs**
+```bash
+# VNet1 ID
+vnet1Id=$(az network vnet show \
+  --resource-group RG1 \
+  --name VNet1 \
+  --query id --out tsv)
+
+# VNet2 ID
+vnet2Id=$(az network vnet show \
+  --resource-group RG2 \
+  --name VNet2 \
+  --query id --out tsv)
+```
+
+**Étape 2 : Créer Peering VNet1 → VNet2**
+```bash
+az network vnet peering create \
+  --name VNet1-to-VNet2 \
+  --resource-group RG1 \
+  --vnet-name VNet1 \
+  --remote-vnet $vnet2Id \
+  --allow-vnet-access
+```
+
+**Étape 3 : Créer Peering VNet2 → VNet1 (Obligatoire !)**
+```bash
+az network vnet peering create \
+  --name VNet2-to-VNet1 \
+  --resource-group RG2 \
+  --vnet-name VNet2 \
+  --remote-vnet $vnet1Id \
+  --allow-vnet-access
+```
+
+**Étape 4 : Vérifier l'état du Peering**
+```bash
+# Vérifier depuis VNet1
+az network vnet peering show \
+  --resource-group RG1 \
+  --vnet-name VNet1 \
+  --name VNet1-to-VNet2 \
+  --query peeringState
+
+# Résultat attendu: "Connected"
+```
+
+**3. Configuration via PowerShell**
+
+```powershell
+# Créer Peering VNet1 → VNet2
+Add-AzVirtualNetworkPeering `
+  -Name "VNet1-to-VNet2" `
+  -VirtualNetwork (Get-AzVirtualNetwork -Name "VNet1" -ResourceGroupName "RG1") `
+  -RemoteVirtualNetworkId "/subscriptions/{sub-id}/resourceGroups/RG2/providers/Microsoft.Network/virtualNetworks/VNet2"
+
+# Créer Peering VNet2 → VNet1 (Obligatoire !)
+Add-AzVirtualNetworkPeering `
+  -Name "VNet2-to-VNet1" `
+  -VirtualNetwork (Get-AzVirtualNetwork -Name "VNet2" -ResourceGroupName "RG2") `
+  -RemoteVirtualNetworkId "/subscriptions/{sub-id}/resourceGroups/RG1/providers/Microsoft.Network/virtualNetworks/VNet1"
+
+# Vérifier l'état
+Get-AzVirtualNetworkPeering `
+  -ResourceGroupName "RG1" `
+  -VirtualNetworkName "VNet1" | 
+  Select-Object Name, PeeringState
+```
+
+**4. Options de Configuration Avancées**
+
+**Options Disponibles :**
+
+| Option | Description | Use Case |
+|--------|-------------|----------|
+| **allow-vnet-access** | Autoriser trafic entre VNets | Par défaut, toujours activé |
+| **allow-forwarded-traffic** | Autoriser trafic transitif via NVA | Hub-spoke avec firewall |
+| **allow-gateway-transit** | Partager VPN/ExpressRoute Gateway | VNet hub avec gateway |
+| **use-remote-gateways** | Utiliser gateway du VNet distant | VNet spoke sans gateway |
+
+**Exemple - Configuration Hub-Spoke :**
+```bash
+# Hub VNet (avec VPN Gateway)
+az network vnet peering create \
+  --name Hub-to-Spoke \
+  --resource-group HubRG \
+  --vnet-name HubVNet \
+  --remote-vnet $spokeVnetId \
+  --allow-vnet-access \
+  --allow-gateway-transit
+
+# Spoke VNet (utilise gateway du Hub)
+az network vnet peering create \
+  --name Spoke-to-Hub \
+  --resource-group SpokeRG \
+  --vnet-name SpokeVNet \
+  --remote-vnet $hubVnetId \
+  --allow-vnet-access \
+  --use-remote-gateways
+```
+
+**5. Caractéristiques Non-Transitives**
+
+**⚠️ Important pour l'Examen :**
+VNet Peering est **NON-TRANSITIF** par défaut
+
+**Scénario :**
+```
+VNet A ←→ VNet B ←→ VNet C
+```
+- VNet A peut communiquer avec VNet B ✅
+- VNet B peut communiquer avec VNet C ✅
+- VNet A **NE PEUT PAS** communiquer avec VNet C ❌
+
+**Solution pour rendre transitif :**
+- Créer un peering direct A ←→ C
+- OU utiliser une architecture Hub-Spoke avec **allow-forwarded-traffic** et une appliance réseau (NVA) dans le hub
+
+**6. Performance et Latence**
+- **Bande passante** : Identique à celle d'un VNet local (pas de limite imposée par le peering)
+- **Latence** : Ultra-faible (< 1ms en regional, quelques ms en global)
+- **Throughput** : Dépend uniquement des VM sizes
+- **Coût Regional** : Ingress gratuit, Egress gratuit dans la même région
+- **Coût Global** : Ingress et Egress facturés ($0.01-0.035/GB selon zones)
+
+**7. Troubleshooting VNet Peering**
+
+**Problèmes Courants :**
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| Peering en état "Initiated" | Peering bidirectionnel incomplet | Créer le peering retour |
+| Communication impossible | NSG bloque le trafic | Vérifier règles NSG avec IP Flow Verify |
+| Peering refusé | Adresses IP chevauchantes | Modifier les plages d'adresses |
+| Gateway transit ne fonctionne pas | Options mal configurées | Vérifier allow-gateway-transit et use-remote-gateways |
+
+**Commandes de Diagnostic :**
+```bash
+# Vérifier l'état du peering
+az network vnet peering list \
+  --resource-group myRG \
+  --vnet-name myVNet \
+  --output table
+
+# Vérifier les plages d'adresses
+az network vnet show \
+  --resource-group myRG \
+  --name myVNet \
+  --query addressSpace.addressPrefixes
+
+# Tester la connectivité (depuis une VM)
+ping <private-ip-remote-vm>
+```
+
+**8. Configuration dans le Portail Azure**
+- **Navigation** : Virtual Network → Peerings → + Add
+- **Bidirectionnel** : Cocher "Configure peering settings on both VNets"
+- **Validation automatique** : Azure vérifie la compatibilité des plages
+- **État** : Doit afficher "Connected" des deux côtés
+
+**9. Best Practices**
+
+✅ **À FAIRE :**
+- Planifier les plages d'adresses dès le début (éviter chevauchements)
+- Toujours configurer le peering dans les deux sens
+- Utiliser des conventions de nommage claires (VNet1-to-VNet2)
+- Documenter la topologie réseau
+- Tester la connectivité après création
+
+❌ **À ÉVITER :**
+- Utiliser des plages d'adresses chevauchantes
+- Oublier le peering bidirectionnel
+- Compter sur la transitivité par défaut
+- Ignorer les NSG qui peuvent bloquer le trafic
 
 #### DNS Resolution
 
@@ -3578,49 +4324,445 @@ Exemple avec autoscaling 2-5 CU:
 - **Methods** : Performance, Geographic, Weighted, Priority
 - **Health monitoring** : Surveillance des endpoints
 
-### 4.4 Network Watcher
+### 4.4 Network Watcher - Outils de Diagnostic Réseau
+
+**⚠️ Erreur Courante QCM : Choisir le bon outil Network Watcher**
 
 #### Vue d'ensemble et Outils
-**Azure Network Watcher** est un service central de monitoring réseau qui fournit des outils pour :
+**Azure Network Watcher** est un service central de monitoring et diagnostic réseau qui fournit des outils pour :
 - **Monitoring** : Surveillance continue des ressources réseau
 - **Diagnostics** : Identification et résolution de problèmes de connectivité
 - **Métriques** : Visualisation des performances réseau
 - **Logging** : Activation/désactivation des logs pour ressources Azure VNet
 
-** Points identifiés pour l'examen :**
+**Disponibilité :**
+- **Activation** : Automatique lors de la création d'un VNet
+- **Scope** : Par région (un Network Watcher par région)
+- **Gestion** : Network Watcher → Région → Outils disponibles
 
-#### Connection Monitor
-- **Usage** : Mesurer RTT entre VMs
-- **Granularity** : Métriques par minute
-- **Targets** : VM, FQDN, URI, IPv4
-- **Protocols** : TCP direct
+**Outils Network Watcher - Vue d'ensemble :**
 
-#### IP Flow Verify - Outil de Diagnostic NSG
+| Outil | Use Case Principal | Sortie | Rapidité | Complexité |
+|-------|-------------------|--------|----------|------------|
+| **IP Flow Verify** | Vérifier si NSG bloque | Allow/Deny + Règle NSG | Immédiat | Faible |
+| **Connection Troubleshoot** | Tester connectivité VM → VM | Reachable/Unreachable | Rapide | Faible |
+| **Next Hop** | Vérifier routage | Type de hop suivant | Immédiat | Faible |
+| **Topology** | Visualiser architecture | Diagramme réseau | Rapide | Faible |
+| **Packet Capture** | Analyser trafic détaillé | Fichier .cap | Long | Élevée |
+| **NSG Flow Logs** | Analyser historique trafic | Logs JSON | Délai analyse | Élevée |
+| **Connection Monitor** | Surveiller latence continue | Métriques temps réel | Continu | Moyenne |
+
+#### 1. IP Flow Verify - Diagnostic NSG (⭐ Outil Principal pour NSG)
+
+**⚠️ Scénario d'Examen Typique :**
+- **Question** : "Une VM ne peut pas se connecter à une autre VM. Quel outil utiliser pour identifier la règle NSG bloquante ?"
+- **Réponse correcte** : **IP Flow Verify**
 
 **Fonctionnalités principales :**
 - **Spécification complète** : Source/destination IPv4, port, protocole (TCP/UDP), direction (inbound/outbound)
-- **Identification précise** : Identifie le NSG spécifique qui bloque la communication
-- **Cas d'usage** : Troubleshooting rapide des problèmes de connectivité
+- **Identification précise** : Identifie le **NSG spécifique** et la **règle exacte** qui bloque
+- **Résultat immédiat** : Allow ou Deny avec détails de la règle
+- **Cas d'usage** : Troubleshooting rapide des problèmes de connectivité NSG
 
-**Comparaison avec autres outils Network Watcher :**
+**Configuration via Azure CLI :**
+```bash
+# Vérifier si le trafic est autorisé
+az network watcher test-ip-flow \
+  --resource-group myRG \
+  --vm myVM \
+  --direction Outbound \
+  --protocol TCP \
+  --local 10.0.0.4:80 \
+  --remote 10.1.0.4:3389
 
-**IP Flow Verify (Recommandé)**
-- **Avantage** : Identification directe du NSG bloquant
-- **Configuration** : Minimale, test immédiat
-- **Résultat** : Règle NSG exacte responsable du blocage
-- **Usage** : Diagnostic rapide et précis
+# Résultat exemple :
+# Access: Deny
+# Rule Name: UserRule_DenyRDP
+# NSG: myNSG
+```
 
-**NSG Flow Logs**
-- **Fonction** : Logging du trafic IP à travers les NSG
-- **Limitation** : Configuration complexe + analyse manuelle
-- **Usage** : Analyse approfondie du trafic sur le long terme
-- **Différence** : Ne pointe pas directement le NSG problématique
+**Configuration via PowerShell :**
+```powershell
+Test-AzNetworkWatcherIPFlow `
+  -NetworkWatcher $nw `
+  -TargetVirtualMachineId $vm.Id `
+  -Direction Outbound `
+  -Protocol TCP `
+  -LocalIPAddress "10.0.0.4" `
+  -LocalPort "80" `
+  -RemoteIPAddress "10.1.0.4" `
+  -RemotePort "3389"
+```
 
-**Packet Capture**
-- **Fonction** : Capture du trafic réseau détaillé
-- **Limitation** : Réduit le scope mais n'identifie pas le NSG
-- **Usage** : Analyse détaillée des paquets réseau
-- **Différence** : Outil d'analyse, pas d'identification NSG
+**Sortie Détaillée :**
+```json
+{
+  "access": "Deny",
+  "ruleName": "SecurityRule_DenyAll",
+  "networkSecurityGroup": "/subscriptions/.../networkSecurityGroups/myNSG"
+}
+```
+
+**Avantages :**
+- ✅ **Identification directe** du NSG bloquant
+- ✅ **Configuration minimale**, test immédiat
+- ✅ **Résultat précis** : règle NSG exacte responsable du blocage
+- ✅ **Usage** : Diagnostic rapide et précis
+
+#### 2. Connection Troubleshoot - Test de Connectivité End-to-End
+
+**Use Case :**
+- Tester la connectivité entre deux ressources Azure
+- Identifier si la communication est possible (reachable/unreachable)
+- Détecter les problèmes de routage, NSG, firewall
+
+**Sources supportées :**
+- Virtual Machines
+- VM Scale Sets
+- Application Gateway
+- Azure Bastion
+
+**Destinations supportées :**
+- VM (IP privée)
+- URI (HTTP/HTTPS)
+- FQDN (nom de domaine)
+- IPv4 publique ou privée
+
+**Configuration via Azure CLI :**
+```bash
+# Tester connectivité VM → VM
+az network watcher test-connectivity \
+  --resource-group myRG \
+  --source-resource myVM1 \
+  --dest-resource myVM2 \
+  --protocol TCP \
+  --dest-port 443
+
+# Tester connectivité VM → URL
+az network watcher test-connectivity \
+  --resource-group myRG \
+  --source-resource myVM1 \
+  --dest-address www.microsoft.com \
+  --protocol TCP \
+  --dest-port 443
+```
+
+**Sortie Exemple :**
+```json
+{
+  "connectionStatus": "Reachable",
+  "avgLatencyInMs": 4,
+  "minLatencyInMs": 2,
+  "maxLatencyInMs": 8,
+  "probesSent": 10,
+  "probesFailed": 0
+}
+```
+
+**Cas d'échec - Diagnostics :**
+```json
+{
+  "connectionStatus": "Unreachable",
+  "hops": [
+    {
+      "type": "Source",
+      "id": "myVM1",
+      "issues": []
+    },
+    {
+      "type": "VirtualNetwork",
+      "issues": []
+    },
+    {
+      "type": "NetworkSecurityGroup",
+      "id": "myNSG",
+      "issues": [
+        {
+          "type": "NetworkSecurityRule",
+          "context": ["Rule 'DenyHTTPS' blocked the connection"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### 3. Next Hop - Vérification du Routage
+
+**Use Case :**
+- Déterminer comment le trafic est routé depuis une VM
+- Identifier le prochain saut (next hop) pour une destination
+- Diagnostiquer problèmes de routage (UDR, routes système)
+
+**Types de Next Hop :**
+- **Internet** : Trafic vers Internet
+- **VirtualAppliance** : Via une appliance réseau (NVA)
+- **VirtualNetworkGateway** : Via VPN ou ExpressRoute Gateway
+- **VnetLocal** : Destination dans le même VNet
+- **VNetPeering** : Destination via VNet Peering
+- **None** : Aucun routage (trafic bloqué)
+
+**Configuration via Azure CLI :**
+```bash
+az network watcher show-next-hop \
+  --resource-group myRG \
+  --vm myVM \
+  --source-ip 10.0.0.4 \
+  --dest-ip 10.1.0.4
+
+# Résultat :
+# NextHopType: VNetPeering
+# NextHopIpAddress: 10.1.0.4
+# RouteTableId: System Route
+```
+
+**Scénario d'Examen :**
+| Question | Next Hop Type | Raison |
+|----------|---------------|--------|
+| Trafic vers 8.8.8.8 | **Internet** | Destination publique |
+| Trafic vers 10.1.0.4 (VNet peeré) | **VNetPeering** | Via peering |
+| Trafic via NVA Firewall | **VirtualAppliance** | UDR configuré |
+| Trafic vers on-premises via VPN | **VirtualNetworkGateway** | Via VPN Gateway |
+
+#### 4. Topology - Visualisation du Réseau
+
+**Use Case :**
+- Visualiser l'architecture réseau d'un Resource Group
+- Comprendre les interconnexions entre ressources
+- Identifier rapidement la topologie globale
+
+**Éléments affichés :**
+- VNets et Subnets
+- VMs et NICs
+- Load Balancers
+- Application Gateways
+- VNet Peerings
+- VPN Gateways
+- NSGs associés
+
+**Configuration via Azure CLI :**
+```bash
+az network watcher show-topology \
+  --resource-group myRG \
+  --output json > topology.json
+```
+
+**Utilisation Portal :**
+```
+Network Watcher → Topology → Sélectionner Resource Group
+```
+
+#### 5. Packet Capture - Analyse de Paquets Réseau
+
+**Use Case :**
+- Capture détaillée du trafic réseau pour analyse approfondie
+- Debugging de problèmes applicatifs (HTTP, SQL, etc.)
+- Analyse de sécurité (détection d'intrusions)
+
+**Configuration :**
+```bash
+# Démarrer une capture
+az network watcher packet-capture create \
+  --resource-group myRG \
+  --vm myVM \
+  --name myCapture \
+  --storage-account mystorageaccount \
+  --time-limit 60
+
+# Arrêter la capture
+az network watcher packet-capture stop \
+  --resource-group myRG \
+  --name myCapture \
+  --location eastus
+
+# Télécharger et analyser avec Wireshark
+```
+
+**Limitations :**
+- Nécessite l'extension VM Network Watcher
+- Capture limitée en durée (max 5 heures)
+- Impact potentiel sur les performances VM
+- Fichiers .cap volumineux
+
+**⚠️ Important :** Ne convient PAS pour identifier rapidement un NSG bloquant (utiliser IP Flow Verify)
+
+#### 6. NSG Flow Logs - Analyse Historique du Trafic
+
+**Use Case :**
+- Analyser le trafic IP à travers les NSG sur une période prolongée
+- Auditer et tracer les connexions réseau
+- Détecter anomalies et patterns de trafic
+- Conformité et forensic
+
+**Configuration :**
+```bash
+# Activer NSG Flow Logs
+az network watcher flow-log create \
+  --resource-group myRG \
+  --nsg myNSG \
+  --storage-account mystorageaccount \
+  --enabled true \
+  --retention 90 \
+  --format JSON \
+  --log-version 2
+
+# Activer Traffic Analytics (optionnel)
+az network watcher flow-log configure \
+  --nsg myNSG \
+  --enabled true \
+  --storage-account mystorageaccount \
+  --workspace myLogAnalyticsWorkspace \
+  --traffic-analytics true
+```
+
+**Format des Logs (Version 2) :**
+```json
+{
+  "time": "2025-10-27T10:00:00Z",
+  "systemId": "xxx",
+  "macAddress": "00-0D-3A-...",
+  "category": "NetworkSecurityGroupFlowEvent",
+  "resourceId": "/subscriptions/.../networkSecurityGroups/myNSG",
+  "operationName": "NetworkSecurityGroupFlowEvents",
+  "properties": {
+    "Version": 2,
+    "flows": [
+      {
+        "rule": "Allow-HTTP",
+        "flows": [
+          {
+            "mac": "00-0D-3A-...",
+            "flowTuples": [
+              "1698393600,10.0.0.4,10.1.0.4,80,3389,T,I,A,C,1024,512,10,5"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Tuple Format :**
+```
+timestamp,source_ip,dest_ip,source_port,dest_port,protocol,flow_direction,flow_state,encryption,bytes_sent,bytes_received,packets_sent,packets_received
+```
+
+**Traffic Analytics :**
+- **Visualisation** : Dashboards dans Azure Monitor
+- **Insights** : Top talkers, blocked traffic, geo-distribution
+- **Alerting** : Alertes sur anomalies détectées
+
+**Limitations :**
+- ❌ Configuration complexe (Storage Account + Log Analytics requis)
+- ❌ Analyse manuelle des logs JSON
+- ❌ Délai d'ingestion (5-10 minutes)
+- ❌ Ne pointe pas directement le NSG problématique en temps réel
+
+#### 7. Connection Monitor - Surveillance Continue de Latence
+
+**Use Case :**
+- Mesurer la latence (RTT - Round Trip Time) entre VMs en continu
+- Surveiller la disponibilité des endpoints
+- Détecter dégradations de performance réseau
+- Monitoring proactif
+
+**Caractéristiques :**
+- **Granularité** : Métriques par minute
+- **Targets** : VM, FQDN, URI, IPv4 privée/publique
+- **Protocols** : TCP, HTTP, HTTPS, ICMP
+- **Monitoring** : 24/7 avec historique
+
+**Configuration via Azure CLI :**
+```bash
+# Créer un Connection Monitor
+az network watcher connection-monitor create \
+  --name myConnectionMonitor \
+  --location eastus \
+  --endpoint-source-name VM1 \
+  --endpoint-source-resource-id $vm1Id \
+  --endpoint-dest-name VM2 \
+  --endpoint-dest-resource-id $vm2Id \
+  --test-config-name HTTPTest \
+  --protocol HTTP \
+  --http-port 80 \
+  --test-frequency 60
+
+# Voir les résultats
+az network watcher connection-monitor show \
+  --name myConnectionMonitor \
+  --location eastus
+```
+
+**Métriques collectées :**
+- **RTT (Round Trip Time)** : Latence moyenne, min, max
+- **Probes Sent/Failed** : Taux de succès
+- **Checks Failed Percent** : Pourcentage d'échec
+
+**Alertes :**
+```bash
+# Créer une alerte si RTT > 100ms
+az monitor metrics alert create \
+  --name HighLatencyAlert \
+  --resource-group myRG \
+  --scopes $connectionMonitorId \
+  --condition "avg RoundTripTimeMs > 100" \
+  --description "Alert when RTT exceeds 100ms"
+```
+
+#### Matrice de Décision - Quel Outil Utiliser ?
+
+| Symptôme / Question | Outil Recommandé | Raison |
+|---------------------|-----------------|--------|
+| **VM ne peut pas communiquer avec une autre VM** | IP Flow Verify | Identifie NSG bloquant + règle exacte |
+| **Identifier quelle règle NSG bloque le trafic** | IP Flow Verify | Diagnostic NSG en temps réel |
+| **Tester si une VM peut atteindre une URL** | Connection Troubleshoot | Test end-to-end avec diagnostics |
+| **Comprendre le routage du trafic** | Next Hop | Montre le prochain saut |
+| **Visualiser l'architecture réseau** | Topology | Diagramme de toutes les ressources |
+| **Analyser trafic détaillé (debugging app)** | Packet Capture | Capture complète pour Wireshark |
+| **Auditer historique de trafic NSG** | NSG Flow Logs | Logs détaillés sur période longue |
+| **Surveiller latence en continu** | Connection Monitor | Monitoring proactif 24/7 |
+
+#### Comparaison Détaillée - Scénarios d'Examen
+
+**Scénario 1 : Communication VM bloquée - Diagnostic rapide**
+- **Besoin** : Identifier pourquoi une VM ne peut pas communiquer
+- **Solution** : **IP Flow Verify** ✅
+- **Raison** : Identification immédiate du NSG et de la règle bloquante
+- **Alternative (mauvaise)** : NSG Flow Logs ❌ (trop long, analyse manuelle)
+
+**Scénario 2 : Vérifier connectivité à un service externe**
+- **Besoin** : Tester si une VM peut atteindre https://api.example.com
+- **Solution** : **Connection Troubleshoot** ✅
+- **Raison** : Test direct avec indication reachable/unreachable
+
+**Scénario 3 : Comprendre pourquoi le trafic passe par un NVA**
+- **Besoin** : Déterminer le routage du trafic
+- **Solution** : **Next Hop** ✅
+- **Raison** : Montre le type de routage (VirtualAppliance) et l'IP du NVA
+
+**Scénario 4 : Analyser un problème applicatif HTTP complexe**
+- **Besoin** : Voir les requêtes/réponses HTTP détaillées
+- **Solution** : **Packet Capture** ✅
+- **Raison** : Capture complète pour analyse Wireshark
+
+**Scénario 5 : Conformité - Audit des connexions sur 6 mois**
+- **Besoin** : Tracer toutes les connexions pour audit
+- **Solution** : **NSG Flow Logs** + Traffic Analytics ✅
+- **Raison** : Historique complet avec rétention longue durée
+
+#### Best Practices Network Watcher
+
+✅ **À FAIRE :**
+- Utiliser **IP Flow Verify** en premier pour problèmes NSG
+- Activer **NSG Flow Logs** pour audit et conformité
+- Configurer **Connection Monitor** pour services critiques
+- Utiliser **Topology** pour comprendre l'architecture
+
+❌ **À ÉVITER :**
+- Utiliser Packet Capture pour identifier un NSG bloquant (trop complexe)
+- Analyser manuellement NSG Flow Logs sans Traffic Analytics
+- Oublier d'activer Network Watcher dans les nouvelles régions
 
 ** Stratégie de diagnostic identifiée :**
 1. **Premier choix** : IP Flow Verify pour identifier rapidement le NSG
@@ -3807,6 +4949,407 @@ Exemple avec autoscaling 2-5 CU:
 - **VM Events/Syslog** → Target = **Log Analytics Workspace**
 - **VM Metrics** → Target = **Virtual Machine**
 - Les VMs envoient logs vers Log Analytics pour analyse
+
+#### Diagnostic Settings - Collecte de Données de Diagnostic
+
+**⚠️ Erreur Courante QCM : Destinations disponibles pour Diagnostic Settings**
+
+**Vue d'ensemble :**
+Les Diagnostic Settings permettent de collecter les **Platform Logs** et **Platform Metrics** des ressources Azure et de les envoyer vers différentes destinations pour analyse, archivage ou intégration.
+
+**Types de données collectées :**
+- **Activity Logs** : Opérations sur les ressources (création, suppression, modification)
+- **Resource Logs** : Logs internes des ressources (ex: SQL queries, Storage operations)
+- **Metrics** : Métriques de performance (CPU, Memory, Network, Storage)
+
+**Destinations Disponibles - Vue Complète :**
+
+| Destination | Use Case | Rétention | Coût | Requiert |
+|-------------|----------|-----------|------|----------|
+| **Log Analytics Workspace** | Analyse et requêtes KQL | Configurable (30-730 jours) | Ingestion + Rétention | Log Analytics Workspace |
+| **Storage Account** | Archivage long terme | Illimitée | Stockage Blob | Storage Account |
+| **Event Hub** | Streaming vers outils externes | Temps réel | Throughput | Event Hub Namespace |
+| **Partner Solutions** | SIEM tiers (Splunk, Datadog) | Selon partenaire | Selon partenaire | Integration configurée |
+
+**1. Log Analytics Workspace - Analyse et Alertes**
+
+**⚠️ Destination PRINCIPALE pour l'examen AZ-104**
+
+**Use Cases :**
+- **Analyse avec KQL** : Requêtes complexes sur logs
+- **Alertes** : Créer alertes basées sur logs
+- **Dashboards** : Visualisations Azure Monitor
+- **Workbooks** : Rapports interactifs
+- **Insights** : VM Insights, Container Insights, Application Insights
+
+**Configuration via Azure CLI :**
+```bash
+# Créer un Log Analytics Workspace
+az monitor log-analytics workspace create \
+  --resource-group myRG \
+  --workspace-name myWorkspace \
+  --location eastus \
+  --retention-time 90
+
+# Configurer Diagnostic Settings pour une VM
+az monitor diagnostic-settings create \
+  --name VMDiagnostics \
+  --resource /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM \
+  --workspace /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.OperationalInsights/workspaces/myWorkspace \
+  --logs '[{"category":"Administrative","enabled":true},{"category":"Security","enabled":true}]' \
+  --metrics '[{"category":"AllMetrics","enabled":true}]'
+```
+
+**Configuration via PowerShell :**
+```powershell
+# Créer Log Analytics Workspace
+New-AzOperationalInsightsWorkspace `
+  -ResourceGroupName "myRG" `
+  -Name "myWorkspace" `
+  -Location "East US" `
+  -Sku "PerGB2018" `
+  -RetentionInDays 90
+
+# Configurer Diagnostic Settings pour Storage Account
+$storageAccount = Get-AzStorageAccount -ResourceGroupName "myRG" -Name "mystorageaccount"
+$workspace = Get-AzOperationalInsightsWorkspace -ResourceGroupName "myRG" -Name "myWorkspace"
+
+Set-AzDiagnosticSetting `
+  -ResourceId $storageAccount.Id `
+  -Name "StorageDiagnostics" `
+  -WorkspaceId $workspace.ResourceId `
+  -Enabled $true `
+  -Category @("StorageWrite", "StorageRead", "StorageDelete")
+```
+
+**Requêtes KQL Utiles :**
+```kusto
+// Toutes les opérations de write sur Storage Account
+StorageBlobLogs
+| where OperationName == "PutBlob"
+| project TimeGenerated, AccountName, Uri, StatusCode, CallerIpAddress
+
+// VMs avec CPU > 80%
+Perf
+| where ObjectName == "Processor" and CounterName == "% Processor Time"
+| where CounterValue > 80
+| summarize avg(CounterValue) by Computer, bin(TimeGenerated, 5m)
+
+// Activité administrative
+AzureActivity
+| where OperationNameValue contains "Microsoft.Compute/virtualMachines"
+| where ActivityStatusValue == "Success"
+| project TimeGenerated, Caller, OperationNameValue, ResourceGroup
+```
+
+**Limites et Coûts :**
+- **Ingestion** : ~$2.50/GB (peut varier selon engagement)
+- **Rétention** : Incluse jusqu'à 31 jours, puis ~$0.12/GB/mois
+- **Requêtes** : Gratuites (incluses)
+- **Alertes** : Coût selon fréquence d'évaluation
+
+**2. Storage Account - Archivage Long Terme**
+
+**Use Cases :**
+- **Archivage** : Logs pour conformité (1-10 ans)
+- **Audit** : Historique complet pour forensic
+- **Coût réduit** : Alternative économique à Log Analytics
+- **Backup logs** : Logs de sauvegarde et restauration
+
+**Configuration via Azure CLI :**
+```bash
+# Configurer Diagnostic Settings vers Storage Account
+az monitor diagnostic-settings create \
+  --name VMDiagToStorage \
+  --resource /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM \
+  --storage-account /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Storage/storageAccounts/mystorageaccount \
+  --logs '[{"category":"Administrative","enabled":true,"retentionPolicy":{"enabled":true,"days":365}}]' \
+  --metrics '[{"category":"AllMetrics","enabled":true,"retentionPolicy":{"enabled":true,"days":90}}]'
+```
+
+**Structure de Stockage :**
+```
+mystorageaccount
+├── insights-logs-administrative/
+│   ├── resourceId=/SUBSCRIPTIONS/{sub-id}/RESOURCEGROUPS/{rg}/PROVIDERS/{provider}/{resource}
+│   │   ├── y=2025/m=10/d=27/h=12/m=00/
+│   │   │   └── PT1H.json
+```
+
+**Format des Logs (JSON) :**
+```json
+{
+  "time": "2025-10-27T12:00:00.000Z",
+  "resourceId": "/subscriptions/.../resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM",
+  "category": "Administrative",
+  "operationName": "Microsoft.Compute/virtualMachines/write",
+  "resultType": "Success",
+  "callerIpAddress": "203.0.113.50",
+  "identity": {
+    "authorization": {
+      "action": "Microsoft.Compute/virtualMachines/write",
+      "scope": "/subscriptions/.../resourceGroups/myRG"
+    }
+  }
+}
+```
+
+**Lifecycle Management :**
+```bash
+# Créer lifecycle policy pour archiver après 90 jours
+az storage account management-policy create \
+  --account-name mystorageaccount \
+  --resource-group myRG \
+  --policy '{
+    "rules": [{
+      "name": "ArchiveLogs",
+      "enabled": true,
+      "type": "Lifecycle",
+      "definition": {
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["insights-logs-"]
+        },
+        "actions": {
+          "baseBlob": {
+            "tierToCool": {"daysAfterModificationGreaterThan": 30},
+            "tierToArchive": {"daysAfterModificationGreaterThan": 90}
+          }
+        }
+      }
+    }]
+  }'
+```
+
+**Limites :**
+- **Analyse** : Pas de requêtes KQL (nécessite téléchargement)
+- **Alertes** : Pas d'alertes en temps réel
+- **Coût** : ~$0.02/GB/mois (Hot), ~$0.01/GB/mois (Cool), ~$0.002/GB/mois (Archive)
+
+**3. Event Hub - Streaming en Temps Réel**
+
+**Use Cases :**
+- **SIEM Integration** : Splunk, QRadar, ArcSight
+- **Custom Processing** : Azure Functions, Stream Analytics
+- **Multi-destination** : Plusieurs consommateurs en parallèle
+- **Near real-time** : Latence < 1 minute
+
+**Configuration via Azure CLI :**
+```bash
+# Créer Event Hub Namespace
+az eventhubs namespace create \
+  --resource-group myRG \
+  --name myEventHubNS \
+  --location eastus \
+  --sku Standard
+
+# Créer Event Hub
+az eventhubs eventhub create \
+  --resource-group myRG \
+  --namespace-name myEventHubNS \
+  --name diagnostics-hub \
+  --partition-count 4 \
+  --message-retention 7
+
+# Configurer Diagnostic Settings vers Event Hub
+az monitor diagnostic-settings create \
+  --name VMDiagToEventHub \
+  --resource /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM \
+  --event-hub myEventHubNS \
+  --event-hub-rule /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.EventHub/namespaces/myEventHubNS/authorizationRules/RootManageSharedAccessKey \
+  --logs '[{"category":"Administrative","enabled":true}]' \
+  --metrics '[{"category":"AllMetrics","enabled":true}]'
+```
+
+**Consumer Example (Azure Function) :**
+```csharp
+[FunctionName("ProcessDiagnosticLogs")]
+public static async Task Run(
+    [EventHubTrigger("diagnostics-hub", Connection = "EventHubConnection")] EventData[] events,
+    ILogger log)
+{
+    foreach (var eventData in events)
+    {
+        string messageBody = Encoding.UTF8.GetString(eventData.Body.Array);
+        var logEntry = JsonConvert.DeserializeObject<DiagnosticLog>(messageBody);
+        
+        // Custom processing
+        if (logEntry.Category == "Security" && logEntry.ResultType == "Failure")
+        {
+            await SendAlertToSlack(logEntry);
+        }
+    }
+}
+```
+
+**Limites et Coûts :**
+- **Throughput** : 1 MB/s par partition (Standard), 20 MB/s (Premium)
+- **Rétention** : 1-7 jours (Standard), jusqu'à 90 jours (Premium)
+- **Coût** : ~$0.028/million events + $11/throughput unit/mois
+
+**4. Partner Solutions - SIEM Tiers**
+
+**Partenaires Disponibles :**
+- **Datadog** : APM et infrastructure monitoring
+- **Elastic (Elasticsearch)** : Search, analytics, visualization
+- **LogRhythm** : SIEM et threat detection
+- **Splunk** : Enterprise SIEM
+- **Sumo Logic** : Cloud-native SIEM
+
+**Configuration :**
+```bash
+# Liste des partenaires disponibles
+az monitor diagnostic-settings subscription list-categories
+
+# Configuration vers Partner Solution (exemple Datadog)
+az monitor diagnostic-settings create \
+  --name VMDiagToDatadog \
+  --resource /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM \
+  --marketplace-partner-id /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Datadog/monitors/myDatadogMonitor \
+  --logs '[{"category":"Administrative","enabled":true}]' \
+  --metrics '[{"category":"AllMetrics","enabled":true}]'
+```
+
+**Avantages :**
+- **Corrélation multi-cloud** : Logs Azure + AWS + GCP
+- **Threat intelligence** : Détection avancée de menaces
+- **Compliance** : Rapports de conformité pré-configurés
+- **Expertise** : Support spécialisé SIEM
+
+**Configuration Multi-Destinations**
+
+**⚠️ Point Important pour l'Examen :**
+Une ressource peut avoir **plusieurs Diagnostic Settings** envoyant vers **différentes destinations simultanément**.
+
+**Exemple - Architecture Complète :**
+```bash
+# Diagnostic Setting 1 : Analyse temps réel
+az monitor diagnostic-settings create \
+  --name RealTimeAnalytics \
+  --resource $vmId \
+  --workspace $logAnalyticsId \
+  --logs '[{"category":"Administrative","enabled":true}]'
+
+# Diagnostic Setting 2 : Archivage long terme
+az monitor diagnostic-settings create \
+  --name LongTermArchive \
+  --resource $vmId \
+  --storage-account $storageAccountId \
+  --logs '[{"category":"Administrative","enabled":true,"retentionPolicy":{"enabled":true,"days":2555}}]'
+
+# Diagnostic Setting 3 : Streaming vers SIEM
+az monitor diagnostic-settings create \
+  --name SIEMIntegration \
+  --resource $vmId \
+  --event-hub $eventHubNSId \
+  --logs '[{"category":"Security","enabled":true}]'
+```
+
+**Architecture Typique - DevOps :**
+```
+Azure Resource (VM, Storage, NSG, etc.)
+├── Diagnostic Setting 1 → Log Analytics Workspace
+│   ├── Requêtes KQL
+│   ├── Alertes temps réel
+│   └── Dashboards Azure Monitor
+│
+├── Diagnostic Setting 2 → Storage Account
+│   ├── Archivage 7 ans (conformité)
+│   ├── Lifecycle policy (Cool → Archive)
+│   └── Backup des logs
+│
+├── Diagnostic Setting 3 → Event Hub
+│   ├── Azure Function (processing custom)
+│   ├── Stream Analytics
+│   └── Splunk/Datadog Integration
+│
+└── Diagnostic Setting 4 → Partner Solution (Datadog)
+    ├── APM
+    ├── Infrastructure monitoring
+    └── Multi-cloud correlation
+```
+
+**Scénarios d'Examen - Diagnostic Settings**
+
+| Besoin | Destination | Raison |
+|--------|-------------|--------|
+| **Créer alertes sur logs VM** | Log Analytics Workspace | Permet requêtes KQL et alertes |
+| **Archiver logs 5 ans pour audit** | Storage Account | Coût faible, rétention illimitée |
+| **Envoyer logs vers Splunk** | Event Hub OU Partner Solution | Streaming temps réel ou intégration native |
+| **Analyser activité administrative** | Log Analytics Workspace | Requêtes et dashboards |
+| **Conformité RGPD (7 ans logs)** | Storage Account | Archivage long terme économique |
+| **Multi-cloud SIEM** | Partner Solution (Datadog, Splunk) | Corrélation Azure + AWS + on-prem |
+
+**Catégories de Logs Disponibles par Type de Ressource**
+
+**Virtual Machines :**
+- Performance counters (métriques CPU, Memory, Disk, Network)
+- Event logs (Windows) / Syslog (Linux)
+- IIS logs (si IIS installé)
+- Nécessite **VM agent** ou **Azure Monitor Agent**
+
+**Storage Account :**
+- StorageRead, StorageWrite, StorageDelete
+- Transaction logs (blob, file, queue, table)
+- Metrics (availability, latency, capacity)
+
+**Network Security Group (NSG) :**
+- NSG Flow Logs (version 1 ou 2)
+- Network Watcher requis
+
+**Azure SQL Database :**
+- SQLInsights, QueryStoreRuntimeStatistics
+- Errors, Timeouts, Deadlocks
+- Automatic tuning, Intelligent insights
+
+**App Service :**
+- AppServiceHTTPLogs, AppServiceConsoleLogs
+- AppServiceAppLogs, AppServiceAuditLogs
+- AppServicePlatformLogs
+
+**Best Practices - Diagnostic Settings**
+
+✅ **À FAIRE :**
+- **Log Analytics** pour toutes les ressources critiques (analyse + alertes)
+- **Storage Account** pour archivage conformité (LRS ou GRS selon criticité)
+- **Rétention appropriée** : 90 jours Log Analytics, 7 ans Storage
+- **Multi-destinations** : Log Analytics (analyse) + Storage (archive)
+- **Catégories sélectives** : N'activer que logs nécessaires (coûts)
+- **Lifecycle policies** : Archiver logs anciens (Cool/Archive tier)
+- **RBAC strict** : Limiter accès aux logs sensibles
+
+❌ **À ÉVITER :**
+- Activer tous les logs sans distinction (coûts élevés)
+- Oublier la rétention (défaut = 30 jours Log Analytics)
+- Storage Account sans lifecycle policy (coûts croissants)
+- Event Hub pour archivage (rétention limitée)
+- Multiple Diagnostic Settings avec mêmes logs (duplication coûts)
+
+**PowerShell - Gestion Complète :**
+```powershell
+# Lister Diagnostic Settings d'une ressource
+Get-AzDiagnosticSetting -ResourceId $vmId
+
+# Supprimer un Diagnostic Setting
+Remove-AzDiagnosticSetting `
+  -ResourceId $vmId `
+  -Name "VMDiagnostics"
+
+# Exporter configuration Diagnostic Settings
+Get-AzDiagnosticSetting -ResourceId $vmId |
+  ConvertTo-Json -Depth 10 |
+  Out-File "diagnostic-settings-backup.json"
+```
+
+**Troubleshooting Diagnostic Settings**
+
+| Problème | Cause Possible | Solution |
+|----------|----------------|----------|
+| Logs n'arrivent pas dans Log Analytics | Agent non installé (VM) | Installer Azure Monitor Agent |
+| Storage Account ne reçoit pas de logs | Permissions insuffisantes | Vérifier RBAC (Monitoring Contributor) |
+| Event Hub sans données | Authorization rule incorrecte | Utiliser RootManageSharedAccessKey |
+| Coûts élevés | Tous les logs activés | Sélectionner catégories pertinentes uniquement |
+| Rétention trop courte | Défaut 30 jours | Configurer rétention 90-730 jours |
 
 #### Types d'Alertes
 
