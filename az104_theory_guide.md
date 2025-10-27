@@ -90,6 +90,50 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **Not all Microsoft 365 services** disponibles dans tous les emplacements
 - **First name, Last name, Other email, User type** : Non obligatoires pour assignation de licence
 
+#### Azure AD Connect - Synchronisation Hybrid
+
+**⚠️ Erreur Courante QCM : Synchronisation des Licences Microsoft 365**
+
+**❌ FAUX :** Azure AD Connect synchronise les licences Microsoft 365
+**✅ CORRECT :** Azure AD Connect synchronise UNIQUEMENT les objets utilisateur et leurs attributs, **PAS les licences**
+
+**Ce qui est synchronisé par Azure AD Connect :**
+- Utilisateurs (User objects)
+- Groupes (Groups)
+- Attributs utilisateur (UPN, displayName, email, etc.)
+- Mots de passe (Password Hash Sync ou Pass-through Authentication)
+- Objets d'appareil (si configuré)
+
+**Ce qui N'EST PAS synchronisé :**
+- ❌ Licences Microsoft 365
+- ❌ Paramètres Exchange Online
+- ❌ Permissions SharePoint
+- ❌ Rôles Azure AD (ils doivent être réassignés)
+
+**Actions nécessaires après synchronisation :**
+```powershell
+# 1. Assigner des licences via PowerShell
+Connect-MsolService
+Set-MsolUser -UserPrincipalName "user@contoso.com" -UsageLocation "FR"
+Set-MsolUserLicense -UserPrincipalName "user@contoso.com" -AddLicenses "contoso:ENTERPRISEPACK"
+
+# 2. Ou via Azure Portal
+# Azure AD → Users → Select user → Licenses → Add assignments
+
+# 3. Ou via Microsoft 365 Admin Center
+# Users → Active users → Select user → Manage product licenses
+```
+
+**Best Practice - Assignation automatique de licences :**
+1. Créer un groupe de sécurité dynamique basé sur des attributs
+2. Assigner des licences au groupe (Group-based licensing)
+3. Les nouveaux utilisateurs synchronisés reçoivent automatiquement les licences
+
+```powershell
+# Exemple de règle de groupe dynamique
+(user.department -eq "Sales") -and (user.usageLocation -eq "FR")
+```
+
 ### 1.2 Role-Based Access Control (RBAC)
 
 #### Rôles Built-in Essentiels
@@ -156,11 +200,72 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **Délégation** : Possibilité de déléguer l'accès à d'autres utilisateurs
 - **Usage** : Administration complète avec gestion des accès
 
-#### Scopes d'assignation
-1. **Management Group** : Niveau le plus élevé
-2. **Subscription** : Toutes les ressources de la souscription
-3. **Resource Group** : Toutes les ressources du groupe
-4. **Resource** : Ressource spécifique
+#### Scopes d'assignation RBAC - Détaillé
+
+**⚠️ Erreur Courante QCM : Niveaux d'assignation et héritage**
+
+**Hiérarchie des Scopes (du plus large au plus précis) :**
+
+```
+Management Group (Racine)
+    ↓ (héritage automatique vers le bas)
+Subscriptions
+    ↓ (héritage automatique vers le bas)
+Resource Groups
+    ↓ (héritage automatique vers le bas)
+Resources (VM, Storage, VNet, etc.)
+```
+
+**✅ Principe d'Héritage RBAC :**
+- Rôle au **Management Group** → S'applique à **toutes** les subscriptions et ressources sous-jacentes
+- Rôle à la **Subscription** → S'applique à **tous** les Resource Groups et ressources
+- Rôle au **Resource Group** → S'applique à **toutes** les ressources du groupe
+- Rôle à une **Resource** → S'applique **uniquement** à cette ressource
+
+**Exemples Pratiques :**
+
+```bash
+# 1. Niveau Subscription - Accès à TOUS les Resource Groups
+az role assignment create \
+  --assignee user@contoso.com \
+  --role "Contributor" \
+  --scope "/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# 2. Niveau Resource Group - Accès à TOUTES les ressources du RG
+az role assignment create \
+  --assignee user@contoso.com \
+  --role "Virtual Machine Contributor" \
+  --resource-group "Production-RG"
+
+# 3. Niveau Resource - Accès SEULEMENT à cette VM spécifique
+az role assignment create \
+  --assignee user@contoso.com \
+  --role "Virtual Machine Contributor" \
+  --scope "/subscriptions/xxx/resourceGroups/Production-RG/providers/Microsoft.Compute/virtualMachines/VM1"
+```
+
+**Scénarios d'Examen :**
+
+| Besoin | Scope | Justification |
+|--------|-------|---------------|
+| Gérer toutes les VMs de l'entreprise | Management Group | Accès multi-subscriptions |
+| Gérer toutes les ressources d'un environnement | Subscription | Accès à tous les RGs |
+| Gérer les ressources d'un projet | Resource Group | Limité au projet |
+| Gérer une VM critique | Resource | Accès ultra-restreint |
+
+**⚠️ Best Practice - Least Privilege :**
+- ✅ TOUJOURS assigner au scope le **plus restreint** possible
+- ❌ ÉVITER Owner/Contributor au niveau Subscription
+- ✅ UTILISER des rôles spécifiques (Storage Blob Data Contributor, etc.)
+
+**Validation des assignations :**
+```bash
+# Lister les assignations d'un utilisateur
+az role assignment list --assignee user@contoso.com --output table
+
+# Vérifier les permissions sur une ressource
+az role assignment list --scope "/subscriptions/xxx/resourceGroups/myRG"
+```
 
 ** Erreur identifiée :** Root Management Group
 - **Aucun accès par défaut** au root management group
@@ -175,11 +280,72 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **Initiative** : Collection de policies
 - **Compliance** : État de conformité des ressources
 
-#### Effects Principaux
-- **Deny** : Bloque la création/modification
-- **Audit** : Marque comme non-conforme (pas de blocage)
-- **Append** : Ajoute des propriétés
-- **DeployIfNotExists** : Déploie des ressources si conditions
+#### Effects Principaux - Détaillé
+
+**⚠️ Erreur Courante QCM : Différence entre Deny et Audit**
+
+| Effet | Action | Quand utiliser |
+|-------|--------|----------------|
+| **Deny** | ❌ **BLOQUE** la création/modification | Standards stricts, compliance obligatoire |
+| **Audit** | ✅ Permet mais **LOG** comme non-compliant | Identifier les ressources non conformes |
+| **Append** | Ajoute des propriétés manquantes | Tags automatiques |
+| **Modify** | Modifie des propriétés existantes | Corriger configurations |
+| **DeployIfNotExists** | Déploie une ressource si absente | Agents de monitoring |
+| **AuditIfNotExists** | Audit si ressource absente | Vérifier présence de sécurité |
+
+**Différence Clé Deny vs Audit :**
+
+**Deny - Prévention (Enforcement)**
+- ❌ **Bloque AVANT** la création de la ressource
+- ✅ **Assure compliance dès le départ**
+- **Use case** : Empêcher création de VMs sans tags, bloquer régions non autorisées
+- **Impact** : Les utilisateurs ne peuvent PAS créer de ressources non conformes
+
+**Audit - Détection (Visibility)**
+- ✅ **Permet la création**, mais log comme non-compliant
+- 📊 **Identifie les ressources** à corriger plus tard
+- **Use case** : Découvrir les ressources existantes non conformes, phase de test
+- **Impact** : Les ressources sont créées, mais marquées pour révision
+
+**Exemple Pratique - Bloquer VMs sans tag "Environment" :**
+
+```json
+{
+  "mode": "Indexed",
+  "policyRule": {
+    "if": {
+      "allOf": [
+        {
+          "field": "type",
+          "equals": "Microsoft.Compute/virtualMachines"
+        },
+        {
+          "field": "tags['Environment']",
+          "exists": "false"
+        }
+      ]
+    },
+    "then": {
+      "effect": "deny"
+    }
+  }
+}
+```
+
+**Assigner une policy avec effet Deny :**
+```bash
+az policy assignment create \
+  --name "require-environment-tag" \
+  --policy "/subscriptions/xxx/providers/Microsoft.Authorization/policyDefinitions/xxx" \
+  --scope "/subscriptions/xxx" \
+  --params '{"effect": {"value": "Deny"}}'
+```
+
+**Scénarios d'examen :**
+- **"Prevent users from..."** → Utiliser **Deny**
+- **"Identify resources that..."** → Utiliser **Audit**
+- **"Automatically add tags..."** → Utiliser **Append**
+- **"Deploy monitoring agent if missing..."** → Utiliser **DeployIfNotExists**
 
 #### Built-in Policies Courantes
 - Require tags on resources
@@ -365,6 +531,276 @@ Root Management Group
 **Read-Access GZRS (RA-GZRS)**
 - Comme GZRS + accès lecture sur région secondaire
 - Combinaison de haute disponibilité et résilience géographique
+
+#### Changement de Type de Réplication (Upgrade/Downgrade)
+
+**⚠️ Erreur Courante QCM : Upgrade LRS → GRS**
+
+**❌ FAUX :** Il faut créer un nouveau Storage Account et migrer les données
+**✅ CORRECT :** Vous pouvez **upgrader directement** le type de réplication sans migration
+
+**Conversions de Réplication Supportées :**
+
+| De | Vers | Supporté | Méthode |
+|----|------|----------|---------|
+| **LRS** | GRS, ZRS, GZRS, RA-GRS, RA-GZRS | ✅ Oui | Portal, CLI, PowerShell |
+| **GRS** | LRS, RA-GRS | ✅ Oui | Portal, CLI, PowerShell |
+| **ZRS** | GZRS, RA-GZRS | ✅ Oui | Portal, CLI, PowerShell |
+| **Premium_LRS** | GRS, ZRS | ❌ Non | Premium ne supporte que LRS/ZRS |
+
+**Méthodes d'Upgrade - Exemples Pratiques :**
+
+**1. Via Azure Portal :**
+```
+Storage Account → Configuration → Replication
+→ Sélectionner GRS ou RA-GRS
+→ Save
+```
+
+**2. Via Azure CLI :**
+```bash
+# Upgrade LRS → GRS
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --sku Standard_GRS
+
+# Upgrade LRS → RA-GRS
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --sku Standard_RAGRS
+
+# Upgrade LRS → ZRS
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --sku Standard_ZRS
+```
+
+**3. Via PowerShell :**
+```powershell
+# Upgrade LRS → GRS
+Set-AzStorageAccount `
+  -ResourceGroupName "myRG" `
+  -Name "mystorageaccount" `
+  -SkuName "Standard_GRS"
+
+# Upgrade LRS → RA-GRS
+Set-AzStorageAccount `
+  -ResourceGroupName "myRG" `
+  -Name "mystorageaccount" `
+  -SkuName "Standard_RAGRS"
+```
+
+**⚠️ Points Importants :**
+
+**Limitations :**
+- ❌ **Premium Storage** (Premium_LRS pour Page Blobs) ne peut PAS être converti en GRS
+- ❌ **FileStorage** et **BlockBlobStorage** limités à LRS/ZRS
+- ✅ **General Purpose v2** supporte toutes les options
+
+**Timing et Impact :**
+- **Durée** : Peut prendre jusqu'à 24-72 heures pour la réplication initiale
+- **Downtime** : ✅ **AUCUN** downtime pendant la conversion
+- **Données** : Les données existantes sont automatiquement répliquées
+- **Coût** : Augmentation du coût mensuel selon le type choisi
+
+**Vérifier le statut de réplication :**
+```bash
+# Vérifier le SKU actuel
+az storage account show \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --query "sku.name" \
+  --output tsv
+
+# Vérifier le statut de geo-replication
+az storage account show \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --query "statusOfPrimary" \
+  --output tsv
+```
+
+**Scénarios d'examen :**
+- **"How to enable geo-redundancy?"** → Upgrade to GRS
+- **"Minimal downtime during replication change?"** → Direct upgrade (zero downtime)
+- **"Can Premium storage use GRS?"** → No, only LRS/ZRS
+- **"Read access to secondary region?"** → Use RA-GRS or RA-GZRS
+
+#### Storage Account Firewall et Sécurité Réseau
+
+**⚠️ Erreur Courante QCM : Autoriser les Services Azure via Firewall**
+
+**Scénario :** Vous activez le firewall sur un Storage Account. Comment autoriser Azure Backup ou autres services Azure à accéder ?
+
+**❌ FAUX :** Ajouter les adresses IP publiques des services Azure
+**✅ CORRECT :** Utiliser **Trusted Microsoft Services** ou **Service Endpoints**
+
+**Par défaut :**
+- Storage Account = **Ouvert à Internet** ("Allow all networks")
+- Après activation firewall = **Tout est BLOQUÉ** sauf autorisations explicites
+
+**Solutions pour Autoriser les Services Azure :**
+
+**Solution 1 : Trusted Microsoft Services (Recommandé)**
+
+```bash
+# Activer le firewall et autoriser les services Microsoft de confiance
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --default-action Deny \
+  --bypass AzureServices
+```
+
+**Via Azure Portal :**
+```
+Storage Account → Networking → Firewalls and virtual networks
+→ Sélectionner "Enabled from selected virtual networks and IP addresses"
+→ ✅ Cocher "Allow trusted Microsoft services to access this storage account"
+```
+
+**Services Concernés (Trusted Microsoft Services) :**
+- ✅ **Azure Backup** - Sauvegarde de VMs et données
+- ✅ **Azure Site Recovery** - Réplication et DR
+- ✅ **Azure File Sync** - Synchronisation de fichiers
+- ✅ **Azure Import/Export** - Migration de données
+- ✅ **Azure Networking (logs)** - Logs diagnostiques
+- ✅ **Azure DevOps** - Pipelines et artefacts
+- ✅ **Azure Monitor** - Métriques et logs
+
+**Solution 2 : Service Endpoints (Accès depuis VNet)**
+
+```bash
+# 1. Activer le service endpoint sur le subnet
+az network vnet subnet update \
+  --vnet-name myVNet \
+  --name mySubnet \
+  --resource-group myRG \
+  --service-endpoints Microsoft.Storage
+
+# 2. Ajouter une règle réseau au Storage Account
+az storage account network-rule add \
+  --account-name mystorageaccount \
+  --resource-group myRG \
+  --vnet-name myVNet \
+  --subnet mySubnet
+```
+
+**Avantages Service Endpoints :**
+- 🔒 Le trafic reste sur le backbone Azure (pas Internet)
+- 🚀 Performance améliorée et latence réduite
+- 💰 Pas de frais de transfert de données sortantes
+- 🎯 Accès depuis VNet spécifiques uniquement
+
+**Solution 3 : Private Endpoint (Sécurité Maximale)**
+
+```bash
+# Créer un Private Endpoint pour le Blob Storage
+az network private-endpoint create \
+  --name myPrivateEndpoint \
+  --resource-group myRG \
+  --vnet-name myVNet \
+  --subnet mySubnet \
+  --private-connection-resource-id "/subscriptions/xxx/resourceGroups/myRG/providers/Microsoft.Storage/storageAccounts/mystorageaccount" \
+  --group-id blob \
+  --connection-name myConnection
+```
+
+**Avantages Private Endpoint :**
+- 🔒 Storage Account obtient une IP **privée** dans votre VNet
+- ❌ **Jamais exposé** à Internet
+- 🎯 Accès via IP privée uniquement (ex: 10.0.1.10)
+- ✅ Compatible avec on-premises via ExpressRoute/VPN
+
+**Solution 4 : Autoriser des IPs Publiques Spécifiques**
+
+```bash
+# Autoriser une IP publique spécifique
+az storage account network-rule add \
+  --account-name mystorageaccount \
+  --resource-group myRG \
+  --ip-address 203.0.113.50
+
+# Autoriser une plage d'IPs (CIDR)
+az storage account network-rule add \
+  --account-name mystorageaccount \
+  --resource-group myRG \
+  --ip-address 203.0.113.0/24
+```
+
+**Configuration PowerShell :**
+```powershell
+# Activer le firewall avec Trusted Services
+Update-AzStorageAccountNetworkRuleSet `
+  -ResourceGroupName "myRG" `
+  -Name "mystorageaccount" `
+  -DefaultAction Deny `
+  -Bypass AzureServices
+
+# Ajouter une Virtual Network Rule
+Add-AzStorageAccountNetworkRule `
+  -ResourceGroupName "myRG" `
+  -Name "mystorageaccount" `
+  -VirtualNetworkResourceId "/subscriptions/xxx/resourceGroups/myRG/providers/Microsoft.Network/virtualNetworks/myVNet/subnets/mySubnet"
+```
+
+**⚠️ Points Critiques :**
+
+**Bypass Options :**
+- `AzureServices` - Autorise les services Microsoft de confiance
+- `Logging` - Autorise les logs Storage Analytics
+- `Metrics` - Autorise les métriques Storage Analytics
+- `None` - Aucun bypass (tout bloqué)
+
+**Ordre de Priorité des Règles :**
+1. **Allow rules** (IP ou VNet) sont évaluées en premier
+2. **Default action** (Allow ou Deny) s'applique si aucune règle ne match
+
+**Scénarios d'Examen :**
+
+| Besoin | Solution | Raison |
+|--------|----------|--------|
+| Azure Backup doit accéder au Storage | **Trusted Services** | Azure Backup est un service de confiance |
+| VMs dans VNet doivent accéder | **Service Endpoint** | Accès depuis subnet spécifique |
+| Aucun accès Internet nécessaire | **Private Endpoint** | IP privée uniquement |
+| Admin depuis bureau doit accéder | **IP Whitelist** | Autoriser IP publique spécifique |
+
+**Vérification et Troubleshooting :**
+
+```bash
+# Lister les règles réseau
+az storage account network-rule list \
+  --account-name mystorageaccount \
+  --resource-group myRG
+
+# Vérifier la configuration actuelle
+az storage account show \
+  --name mystorageaccount \
+  --resource-group myRG \
+  --query "networkRuleSet"
+
+# Tester l'accès depuis une VM
+# (Depuis la VM)
+nslookup mystorageaccount.blob.core.windows.net
+curl -I https://mystorageaccount.blob.core.windows.net/mycontainer
+```
+
+**⚠️ ATTENTION - Pièges Courants :**
+
+1. **Après activation du firewall, pensez à autoriser VOTRE IP** pour continuer à accéder via le Portal !
+2. **Service Endpoints** ne fonctionnent QUE pour le trafic depuis Azure (pas on-premises)
+3. **Private Endpoints** nécessitent une configuration DNS spécifique
+4. **Trusted Services** ne couvre PAS tous les services Azure (vérifier la liste)
+
+**Best Practices :**
+- ✅ Utiliser **Trusted Services** pour les services Azure intégrés
+- ✅ Utiliser **Service Endpoints** pour les VMs/Apps dans VNets
+- ✅ Utiliser **Private Endpoints** pour sécurité maximale
+- ❌ **Éviter** "Allow all networks" en production
+- ✅ **Toujours** autoriser votre IP admin pour gestion
 
 ### 2.2 Azure Files (Mise à jour 2024)
 
@@ -1039,6 +1475,117 @@ other::---             # Autres n'ont aucun droit
 - **Standard SSD** : Workloads modérés, balance performance/coût
 - **Premium SSD** : Workloads critiques, haute performance
 - **Ultra Disk** : Workloads extrêmes, latence ultra-faible
+
+#### Création de VM avec Data Disks
+
+**⚠️ Erreur Courante QCM : Attacher plusieurs data disks dès la création**
+
+**Scénario :** Créer une VM avec 3 disques de données (data disks) attachés dès la création.
+
+**Solution : Azure CLI (Méthode la plus simple)**
+
+```bash
+# Créer une VM avec 3 data disks en une seule commande
+az vm create \
+  --resource-group myRG \
+  --name myVM \
+  --image UbuntuLTS \
+  --size Standard_D2s_v3 \
+  --admin-username azureuser \
+  --generate-ssh-keys \
+  --data-disk-sizes-gb 128 256 512
+  # Créera automatiquement 3 disques: 128GB, 256GB et 512GB
+```
+
+**Paramètres clés :**
+- `--data-disk-sizes-gb` : Liste des tailles de disques séparées par espaces
+- Les disques sont créés automatiquement et attachés
+- LUN (Logical Unit Number) assignés automatiquement : 0, 1, 2, etc.
+
+**Concepts Importants :**
+
+**LUN (Logical Unit Number) :**
+- **Identifiant unique** pour chaque disque attaché à une VM
+- **Numérotation** : Commence à 0 (LUN 0, LUN 1, LUN 2, etc.)
+- **Maximum** : Dépend de la taille de VM
+  - Standard_D2s_v3 : Max 8 data disks (LUN 0-7)
+  - Standard_D16s_v3 : Max 32 data disks (LUN 0-31)
+
+**Persistance des Data Disks :**
+- ✅ **PERSISTANTS** : Les données sont conservées lors arrêts/redémarrages
+- ✅ **Managed Disks** : Gestion automatique par Azure
+- ✅ **Snapshots** : Possibilité de créer des snapshots pour backup
+- ❌ **Différent du disque temporaire (D:)** qui est volatile
+
+**Scénarios d'Examen :**
+
+| Question | Réponse | Raison |
+|----------|---------|--------|
+| Créer VM avec 3 disques de données | `--data-disk-sizes-gb 128 256 512` | Azure CLI option la plus simple |
+| Maximum de data disks sur Standard_D2s_v3 | 8 disks | Dépend de la taille de VM |
+| Les data disks sont-ils persistants ? | Oui | Contrairement au disque temporaire D: |
+| Identifier un data disk dans la VM | Par LUN (0, 1, 2...) | Logical Unit Number |
+
+#### Accès Externe aux VMs
+
+**⚠️ Erreur Courante QCM : Minimize Administrative Effort**
+
+**Scénario :** Une VM est accessible uniquement depuis le réseau interne. Vous devez permettre l'accès depuis Internet avec **effort administratif minimal**.
+
+**❌ FAUX :** Configurer un VPN Site-to-Site
+**✅ CORRECT :** **Ajouter une adresse IP publique** à la VM
+
+**Comparaison des Solutions :**
+
+| Solution | Complexité | Coût | Temps | Effort Admin |
+|----------|------------|------|-------|--------------|
+| **IP Publique** | ✅ Très faible | ~$3/mois | 2 min | ✅ Minimal |
+| **Azure Bastion** | Moyenne | ~$150/mois | 15 min | Moyen |
+| **VPN Site-to-Site** | ❌ Élevée | ~$25-150/mois | 1-2h | ❌ Élevé |
+
+**Solution Recommandée - Ajouter une IP Publique :**
+
+```bash
+# 1. Créer une IP publique
+az network public-ip create \
+  --resource-group myRG \
+  --name myVM-PublicIP \
+  --sku Standard \
+  --allocation-method Static
+
+# 2. Associer l'IP publique à la NIC de la VM
+az network nic ip-config update \
+  --resource-group myRG \
+  --nic-name myVM-NIC \
+  --name ipconfig1 \
+  --public-ip-address myVM-PublicIP
+```
+
+**⚠️ Sécurité - NSG Recommandé :**
+
+```bash
+# Limiter l'accès SSH/RDP à votre IP uniquement
+az network nsg rule create \
+  --resource-group myRG \
+  --nsg-name myVM-NSG \
+  --name Allow-SSH-MyIP \
+  --priority 100 \
+  --source-address-prefixes 203.0.113.50/32 \
+  --destination-port-ranges 22 \
+  --access Allow \
+  --protocol Tcp
+```
+
+**Pourquoi PAS VPN Site-to-Site ?**
+- ❌ **Complexe** : Local Network Gateway, Virtual Network Gateway, Connection
+- ❌ **Temps** : 1-2 heures de configuration
+- ❌ **Coût** : Gateway ~$25-150/mois
+- ⚠️ **Use case** : Connectivité réseau entier, pas une seule VM
+
+**Scénarios d'Examen :**
+- **"Minimal administrative effort"** → Add Public IP
+- **"Secure access without exposing ports"** → Azure Bastion
+- **"Connect entire on-premises network"** → VPN Site-to-Site
 
 #### High Availability
 
