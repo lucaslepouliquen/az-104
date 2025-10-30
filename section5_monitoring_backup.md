@@ -497,45 +497,1293 @@ Event | where EventLevelName == "Error"
 Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 ```
 
+#### Action Groups - Notifications et Actions Automatiques
+
+**⚠️ Concept Important pour l'Examen**
+
+Les **Action Groups** définissent les actions à exécuter lorsqu'une alerte est déclenchée.
+
+**Types d'Actions Disponibles :**
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| **Email/SMS/Push/Voice** | Notifications aux personnes | Alertes critiques équipe DevOps |
+| **Azure Function** | Exécution code serverless | Processing custom, enrichissement données |
+| **Logic App** | Workflows complexes | Intégration ServiceNow, Jira, Teams |
+| **Webhook** | Appel HTTP endpoint | Intégration systèmes externes |
+| **Automation Runbook** | Scripts PowerShell/Python | Remediation automatique (restart VM) |
+| **ITSM** | Incident management | ServiceNow, BMC Remedy |
+| **Event Hub** | Streaming événements | Archivage, processing en masse |
+| **Secure Webhook** | Webhook avec authentification Azure AD | Sécurité renforcée |
+
+**Configuration via Azure CLI :**
+```bash
+# Créer Action Group avec email et runbook
+az monitor action-group create \
+  --name CriticalAlerts \
+  --resource-group myRG \
+  --short-name CritAlerts \
+  --email-receiver admin email=admin@contoso.com \
+  --automation-runbook name=StopVM \
+    runbookName=Stop-AzureVM \
+    webhookResourceId=/subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Automation/automationAccounts/myAutomation/webhooks/stopvm \
+    serviceUri=https://s1events.azure-automation.net/webhooks?token=...
+```
+
+**Configuration via PowerShell :**
+```powershell
+# Email Receiver
+$emailReceiver = New-AzActionGroupReceiver `
+  -Name "AdminEmail" `
+  -EmailReceiver `
+  -EmailAddress "admin@contoso.com"
+
+# Runbook Receiver pour auto-remediation
+$runbookReceiver = New-AzActionGroupReceiver `
+  -Name "StopVMRunbook" `
+  -AutomationRunbookReceiver `
+  -AutomationAccountId "/subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Automation/automationAccounts/myAutomation" `
+  -RunbookName "Stop-AzureVM" `
+  -WebhookResourceId "/subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Automation/automationAccounts/myAutomation/webhooks/stopvm" `
+  -IsGlobalRunbook $false `
+  -ServiceUri "https://s1events.azure-automation.net/webhooks?token=..." `
+  -UseCommonAlertSchema $true
+
+# Créer Action Group
+Set-AzActionGroup `
+  -Name "CriticalAlerts" `
+  -ResourceGroupName "myRG" `
+  -ShortName "CritAlerts" `
+  -Receiver $emailReceiver, $runbookReceiver
+```
+
+**Common Alert Schema :**
+```json
+{
+  "schemaId": "azureMonitorCommonAlertSchema",
+  "data": {
+    "essentials": {
+      "alertId": "/subscriptions/{sub-id}/providers/Microsoft.AlertsManagement/alerts/{alert-id}",
+      "alertRule": "CPU > 80%",
+      "severity": "Sev2",
+      "signalType": "Metric",
+      "monitorCondition": "Fired",
+      "monitoringService": "Platform",
+      "alertTargetIDs": ["/subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM"],
+      "originAlertId": "{guid}",
+      "firedDateTime": "2025-10-30T10:00:00.000Z",
+      "description": "CPU usage exceeded 80%"
+    },
+    "alertContext": {
+      "properties": null,
+      "conditionType": "SingleResourceMultipleMetricCriteria",
+      "condition": {
+        "allOf": [
+          {
+            "metricName": "Percentage CPU",
+            "metricValue": 85.5,
+            "threshold": 80,
+            "operator": "GreaterThan",
+            "timeAggregation": "Average"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Best Practices - Action Groups :**
+✅ **À FAIRE :**
+- Un Action Group par criticité (Critical, Warning, Info)
+- Common Alert Schema pour uniformité
+- Runbooks pour auto-remediation (restart services, scale out)
+- Email pour notifications humaines
+- ITSM pour tracking incidents
+- Tester régulièrement les Action Groups
+
+❌ **À ÉVITER :**
+- Trop de notifications (alert fatigue)
+- Actions destructives sans confirmation
+- Webhooks non sécurisés pour données sensibles
+
+#### Azure Monitor Agents - Collecte de Données VM
+
+**⚠️ Important pour l'Examen AZ-104**
+
+**Types d'Agents Disponibles :**
+
+| Agent | Plateformes | Use Case | Status |
+|-------|-------------|----------|--------|
+| **Azure Monitor Agent (AMA)** | Windows, Linux | Agent unifié recommandé | ✅ Recommandé |
+| **Log Analytics Agent (MMA/OMS)** | Windows, Linux | Legacy, toujours supporté | ⚠️ Deprecated 2024 |
+| **Diagnostics Extension (WAD/LAD)** | Windows, Linux | Métriques vers Storage Account | Legacy |
+| **Telegraf Agent** | Linux | Métriques custom | Spécialisé |
+| **Dependency Agent** | Windows, Linux | Service Map, VM Insights | Complémentaire |
+
+**Azure Monitor Agent (AMA) - Configuration**
+
+**⚠️ Agent Recommandé pour Nouvelles Implémentations**
+
+**Installation via Azure CLI :**
+```bash
+# Installer AMA sur VM Windows
+az vm extension set \
+  --resource-group myRG \
+  --vm-name myWindowsVM \
+  --name AzureMonitorWindowsAgent \
+  --publisher Microsoft.Azure.Monitor \
+  --enable-auto-upgrade true
+
+# Installer AMA sur VM Linux
+az vm extension set \
+  --resource-group myRG \
+  --vm-name myLinuxVM \
+  --name AzureMonitorLinuxAgent \
+  --publisher Microsoft.Azure.Monitor \
+  --enable-auto-upgrade true
+```
+
+**Installation via PowerShell :**
+```powershell
+# Windows VM
+Set-AzVMExtension `
+  -ResourceGroupName "myRG" `
+  -VMName "myWindowsVM" `
+  -Name "AzureMonitorWindowsAgent" `
+  -Publisher "Microsoft.Azure.Monitor" `
+  -ExtensionType "AzureMonitorWindowsAgent" `
+  -TypeHandlerVersion "1.0" `
+  -EnableAutomaticUpgrade $true
+
+# Linux VM
+Set-AzVMExtension `
+  -ResourceGroupName "myRG" `
+  -VMName "myLinuxVM" `
+  -Name "AzureMonitorLinuxAgent" `
+  -Publisher "Microsoft.Azure.Monitor" `
+  -ExtensionType "AzureMonitorLinuxAgent" `
+  -TypeHandlerVersion "1.0" `
+  -EnableAutomaticUpgrade $true
+```
+
+**Data Collection Rules (DCR) - Configuration de Collecte**
+
+**⚠️ DCR obligatoires avec Azure Monitor Agent**
+
+```bash
+# Créer Data Collection Rule
+az monitor data-collection rule create \
+  --name myDCR \
+  --resource-group myRG \
+  --location eastus \
+  --rule-file dcr-config.json
+
+# Associer DCR à une VM
+az monitor data-collection rule association create \
+  --name myDCRAssociation \
+  --rule-id /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Insights/dataCollectionRules/myDCR \
+  --resource /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM
+```
+
+**Exemple DCR JSON :**
+```json
+{
+  "location": "eastus",
+  "properties": {
+    "dataSources": {
+      "performanceCounters": [
+        {
+          "name": "perfCounterDataSource",
+          "streams": ["Microsoft-Perf"],
+          "samplingFrequencyInSeconds": 60,
+          "counterSpecifiers": [
+            "\\Processor(_Total)\\% Processor Time",
+            "\\Memory\\Available Bytes",
+            "\\LogicalDisk(_Total)\\% Free Space"
+          ]
+        }
+      ],
+      "windowsEventLogs": [
+        {
+          "name": "eventLogsDataSource",
+          "streams": ["Microsoft-Event"],
+          "xPathQueries": [
+            "Application!*[System[(Level=1 or Level=2 or Level=3)]]",
+            "System!*[System[(Level=1 or Level=2 or Level=3)]]"
+          ]
+        }
+      ],
+      "syslog": [
+        {
+          "name": "syslogDataSource",
+          "streams": ["Microsoft-Syslog"],
+          "facilityNames": ["auth", "authpriv", "cron", "daemon", "kern"],
+          "logLevels": ["Debug", "Info", "Notice", "Warning", "Error", "Critical", "Alert", "Emergency"]
+        }
+      ]
+    },
+    "destinations": {
+      "logAnalytics": [
+        {
+          "workspaceResourceId": "/subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.OperationalInsights/workspaces/myWorkspace",
+          "name": "centralWorkspace"
+        }
+      ]
+    },
+    "dataFlows": [
+      {
+        "streams": ["Microsoft-Perf", "Microsoft-Event", "Microsoft-Syslog"],
+        "destinations": ["centralWorkspace"]
+      }
+    ]
+  }
+}
+```
+
+**Avantages Azure Monitor Agent vs Legacy :**
+- ✅ **Data Collection Rules (DCR)** : Configuration centralisée et réutilisable
+- ✅ **Multi-homing amélioré** : Plusieurs workspaces facilement
+- ✅ **Filtering** : Filtrage données avant envoi (économies)
+- ✅ **Security** : Managed Identity support
+- ✅ **Performance** : Meilleure efficacité réseau
+
+**Migration MMA → AMA :**
+```powershell
+# Vérifier si MMA installé
+Get-AzVMExtension -ResourceGroupName "myRG" -VMName "myVM" |
+  Where-Object {$_.ExtensionType -eq "MicrosoftMonitoringAgent"}
+
+# Installer AMA
+Set-AzVMExtension `
+  -ResourceGroupName "myRG" `
+  -VMName "myVM" `
+  -Name "AzureMonitorWindowsAgent" `
+  -Publisher "Microsoft.Azure.Monitor" `
+  -ExtensionType "AzureMonitorWindowsAgent" `
+  -TypeHandlerVersion "1.0"
+
+# Créer et associer DCR (voir exemple ci-dessus)
+
+# Désinstaller MMA après validation
+Remove-AzVMExtension `
+  -ResourceGroupName "myRG" `
+  -VMName "myVM" `
+  -Name "MicrosoftMonitoringAgent" `
+  -Force
+```
+
+#### VM Insights - Monitoring Avancé des VMs
+
+**⚠️ Fonctionnalité Importante pour l'Examen**
+
+VM Insights fournit un monitoring complet des VMs avec métriques de performance, dépendances d'applications et health monitoring.
+
+**Composants Requis :**
+1. **Azure Monitor Agent** ou **Log Analytics Agent**
+2. **Dependency Agent** (pour Service Map)
+3. **Log Analytics Workspace**
+4. **Data Collection Rule** (si AMA)
+
+**Activation via Portal :**
+1. VM → **Monitoring** → **Insights**
+2. **Enable**
+3. Choisir **Log Analytics Workspace**
+4. Configuration automatique des agents
+
+**Activation via PowerShell :**
+```powershell
+# Installer VM Insights avec Azure Monitor Agent
+Install-Module -Name Az.MonitoringSolutions
+
+# Enable VM Insights
+Set-AzVMExtension `
+  -ResourceGroupName "myRG" `
+  -VMName "myVM" `
+  -Name "DependencyAgentWindows" `
+  -Publisher "Microsoft.Azure.Monitoring.DependencyAgent" `
+  -ExtensionType "DependencyAgentWindows" `
+  -TypeHandlerVersion "9.10"
+
+# Configurer Log Analytics Workspace
+$workspace = Get-AzOperationalInsightsWorkspace `
+  -ResourceGroupName "myRG" `
+  -Name "myWorkspace"
+
+# Activer VM Insights solution
+Set-AzOperationalInsightsIntelligencePack `
+  -ResourceGroupName "myRG" `
+  -WorkspaceName "myWorkspace" `
+  -IntelligencePackName "VMInsights" `
+  -Enabled $true
+```
+
+**Métriques Collectées :**
+- **Performance** : CPU, Memory, Disk, Network
+- **Processes** : Processus running et connexions
+- **Dependencies** : Connexions réseau entre VMs et services externes
+- **Logical Disk** : Space, IOPS, throughput
+- **Network Adapter** : Bytes sent/received, packets
+
+**Requêtes KQL - VM Insights :**
+```kusto
+// Top 10 VMs par utilisation CPU
+InsightsMetrics
+| where Namespace == "Processor" and Name == "UtilizationPercentage"
+| summarize avg(Val) by Computer
+| top 10 by avg_Val desc
+
+// Connexions réseau actives
+VMConnection
+| where TimeGenerated > ago(1h)
+| summarize count() by Computer, RemoteIp, Direction
+| order by count_ desc
+
+// Processus consommant le plus de mémoire
+VMProcess
+| where TimeGenerated > ago(1h)
+| summarize avg(WorkingSetMemory) by ProcessName, Computer
+| top 10 by avg_WorkingSetMemory desc
+
+// Services Map - Dépendances
+VMBoundPort
+| where TimeGenerated > ago(24h)
+| where Machine == "myVM"
+| summarize count() by Port, ProcessName
+| order by count_ desc
+```
+
+**Service Map - Visualisation des Dépendances :**
+- **Inbound connections** : Clients se connectant à la VM
+- **Outbound connections** : Services externes utilisés
+- **Ports** : Ports d'écoute et connexions actives
+- **Failed connections** : Tentatives de connexion échouées
+
+**Use Cases VM Insights :**
+- 🔍 **Troubleshooting performance** : Identifier bottlenecks CPU/Memory/Disk
+- 🗺️ **Application mapping** : Comprendre architecture et dépendances
+- 📊 **Capacity planning** : Dimensionnement VMs
+- 🚨 **Alerting** : Alertes sur seuils performance
+- 🔒 **Security** : Détecter connexions non autorisées
+
+#### Application Insights - APM pour Applications
+
+**⚠️ Pour l'Examen : Application Insights fait partie d'Azure Monitor**
+
+**Types d'Applications Supportées :**
+- .NET, .NET Core, Java, Node.js, Python, JavaScript
+- App Service, Azure Functions, VMs, On-premises, Kubernetes
+
+**Installation - App Service :**
+```bash
+# Activer Application Insights sur App Service
+az webapp config appsettings set \
+  --resource-group myRG \
+  --name myWebApp \
+  --settings APPINSIGHTS_INSTRUMENTATIONKEY={instrumentation-key}
+
+# Ou via connection string (recommandé)
+az webapp config appsettings set \
+  --resource-group myRG \
+  --name myWebApp \
+  --settings APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey={key};IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/"
+```
+
+**Installation - .NET Application :**
+```bash
+# NuGet package
+dotnet add package Microsoft.ApplicationInsights.AspNetCore
+```
+
+**Configuration - appsettings.json :**
+```json
+{
+  "ApplicationInsights": {
+    "ConnectionString": "InstrumentationKey={key};IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/"
+  },
+  "Logging": {
+    "ApplicationInsights": {
+      "LogLevel": {
+        "Default": "Information",
+        "Microsoft": "Warning"
+      }
+    }
+  }
+}
+```
+
+**Données Collectées :**
+- **Requests** : HTTP requests, response times, URLs
+- **Dependencies** : SQL, HTTP, Redis, Azure services
+- **Exceptions** : Stack traces, error messages
+- **Page Views** : Client-side navigation
+- **Custom Events** : Business metrics, user actions
+- **Metrics** : Performance counters, custom metrics
+- **Traces** : Logs applicatifs
+
+**Requêtes KQL - Application Insights :**
+```kusto
+// Requests avec temps de réponse > 1s
+requests
+| where timestamp > ago(1h)
+| where duration > 1000
+| project timestamp, name, url, duration, resultCode
+| order by duration desc
+
+// Top 10 exceptions
+exceptions
+| where timestamp > ago(24h)
+| summarize count() by type, outerMessage
+| top 10 by count_ desc
+
+// Dépendances SQL lentes
+dependencies
+| where timestamp > ago(1h)
+| where type == "SQL"
+| where duration > 500
+| project timestamp, name, data, duration, success
+| order by duration desc
+
+// Availability (tests synthétiques)
+availabilityResults
+| where timestamp > ago(24h)
+| summarize SuccessRate = 100.0 * countif(success == true) / count() by name
+| order by SuccessRate asc
+```
+
+**Smart Detection - Alertes Automatiques :**
+- **Failure anomalies** : Augmentation soudaine des échecs
+- **Performance anomalies** : Dégradation temps de réponse
+- **Memory leak detection** : Fuite mémoire détectée
+- **Slow page load time** : Chargement page lent
+- **Exception volume** : Volume d'exceptions anormal
+
+**Application Map :**
+```
+[Client Browser]
+    ↓
+[App Service: myWebApp] → [SQL Database: myDB]
+    ↓                        ↓
+[Redis Cache]            [Slow queries detected]
+    ↓
+[Azure Storage]
+```
+
 ### 5.2 Azure Backup
 
-#### Recovery Services Vault
+#### Recovery Services Vault - Fondamentaux
 
-** Règles critiques identifiées :**
+**⚠️ Règles Critiques pour l'Examen AZ-104**
 
 **Localisation :**
-- Vault et ressources **dans la même région**
+- Vault et ressources **dans la même région obligatoire**
 - Example : Vault2 (West US) peut sauvegarder Storage1 (West US)
 - Share1 sauvegardable car dans Storage1 même région
+- **Cross-region restore** : Possible si GRS activé sur vault
 
-**Suppression du Vault :**
-1. **D'abord** : Arrêter backup de tous les éléments protégés
-2. **Ensuite** : Supprimer le vault
-3. **Erreur** : Vault ne peut pas être supprimé avec éléments protégés
+**Création via Azure CLI :**
+```bash
+# Créer Recovery Services Vault
+az backup vault create \
+  --resource-group myRG \
+  --name myVault \
+  --location eastus
 
-#### Backup Policies
+# Configurer redundancy (LRS ou GRS)
+az backup vault backup-properties set \
+  --resource-group myRG \
+  --name myVault \
+  --backup-storage-redundancy GeoRedundant
+```
 
-** Limites par type de ressource :**
-- **VMs** : Maximum 100 VMs par policy
-- **SQL Databases** : Policy séparée requise
-- **File Shares** : Policy séparée requise
+**Création via PowerShell :**
+```powershell
+# Créer Resource Group
+New-AzResourceGroup -Name "myRG" -Location "East US"
+
+# Créer Recovery Services Vault
+New-AzRecoveryServicesVault `
+  -ResourceGroupName "myRG" `
+  -Name "myVault" `
+  -Location "East US"
+
+# Obtenir le vault context
+$vault = Get-AzRecoveryServicesVault `
+  -ResourceGroupName "myRG" `
+  -Name "myVault"
+
+# Configurer Storage Redundancy (doit être fait AVANT premier backup)
+Set-AzRecoveryServicesBackupProperty `
+  -Vault $vault `
+  -BackupStorageRedundancy GeoRedundant
+```
+
+**Storage Redundancy Options :**
+
+| Type | Copies | Cross-Region | Use Case | Coût |
+|------|--------|--------------|----------|------|
+| **LRS** | 3 copies (même datacenter) | Non | Dev/Test, données non critiques | Faible |
+| **ZRS** | 3 copies (3 zones) | Non | Production, haute disponibilité | Moyen |
+| **GRS** | 6 copies (primaire + secondaire) | Oui | Données critiques, DR | Élevé |
+
+**⚠️ Important :** Storage Redundancy ne peut être changé qu'AVANT le premier backup.
+
+**Suppression du Vault - Procédure Correcte :**
+
+```powershell
+# 1. Lister tous les éléments protégés
+$vault = Get-AzRecoveryServicesVault -ResourceGroupName "myRG" -Name "myVault"
+Set-AzRecoveryServicesVaultContext -Vault $vault
+
+$containers = Get-AzRecoveryServicesBackupContainer -ContainerType AzureVM -VaultId $vault.ID
+
+# 2. Arrêter backup et supprimer données pour chaque VM
+foreach ($container in $containers) {
+    $backupItems = Get-AzRecoveryServicesBackupItem `
+        -Container $container `
+        -WorkloadType AzureVM `
+        -VaultId $vault.ID
+    
+    foreach ($item in $backupItems) {
+        # Désactiver soft delete si activé
+        Disable-AzRecoveryServicesBackupProtection `
+            -Item $item `
+            -VaultId $vault.ID `
+            -RemoveRecoveryPoints `
+            -Force
+    }
+}
+
+# 3. Désactiver soft delete au niveau vault
+Set-AzRecoveryServicesVaultProperty `
+    -VaultId $vault.ID `
+    -SoftDeleteFeatureState Disable
+
+# 4. Supprimer le vault
+Remove-AzRecoveryServicesVault -Vault $vault -Force
+```
+
+**Erreurs Courantes :**
+❌ **Vault ne peut pas être supprimé avec éléments protégés**
+✅ Arrêter backup + supprimer recovery points d'abord
+
+❌ **Soft delete empêche suppression**
+✅ Désactiver soft delete au niveau vault
+
+#### Soft Delete - Protection Contre Suppression Accidentelle
+
+**⚠️ Activé par Défaut depuis 2020**
+
+**Fonctionnement :**
+- Backup supprimé → **Retained 14 jours** en soft delete state
+- Restauration possible pendant 14 jours
+- Aucun coût supplémentaire pendant soft delete
+- Après 14 jours → Suppression définitive
+
+**Configuration via PowerShell :**
+```powershell
+# Activer soft delete
+Set-AzRecoveryServicesVaultProperty `
+    -VaultId $vault.ID `
+    -SoftDeleteFeatureState Enable
+
+# Désactiver soft delete (déconseillé)
+Set-AzRecoveryServicesVaultProperty `
+    -VaultId $vault.ID `
+    -SoftDeleteFeatureState Disable
+
+# Enhanced soft delete (always-on, ne peut pas être désactivé)
+Set-AzRecoveryServicesVaultProperty `
+    -VaultId $vault.ID `
+    -SoftDeleteFeatureState AlwaysOn
+```
+
+**Restaurer depuis Soft Delete :**
+```powershell
+# Undelete backup item
+$softDeletedItems = Get-AzRecoveryServicesBackupItem `
+    -BackupManagementType AzureVM `
+    -WorkloadType AzureVM `
+    -VaultId $vault.ID `
+    -DeleteState ToBeDeleted
+
+Undo-AzRecoveryServicesBackupItemDeletion `
+    -Item $softDeletedItems[0] `
+    -VaultId $vault.ID `
+    -Force
+```
+
+**Security PIN :**
+- Protection supplémentaire pour opérations critiques
+- Requis pour : Disable backup, Change passphrase, Unregister server
+
+```powershell
+# Générer Security PIN (valide 5 minutes)
+Get-AzRecoveryServicesVaultSettingsFile `
+    -Vault $vault `
+    -Path "C:\Temp\"
+
+# Le PIN sera affiché dans le portail
+```
+
+#### Backup Policies - Stratégies de Sauvegarde
+
+**⚠️ Limites par Type de Ressource :**
+- **VMs Azure** : Maximum 100 VMs par policy
+- **SQL in Azure VM** : Policy séparée requise
+- **SAP HANA in Azure VM** : Policy séparée requise
+- **Azure Files** : Policy séparée requise
 
 **Example :** 100 VMs + 20 SQL + 50 Files = **3 policies minimum**
+
+**Créer Backup Policy pour Azure VMs :**
+
+```powershell
+# Policy avec backup quotidien + rétention
+$schedulePolicy = Get-AzRecoveryServicesBackupSchedulePolicyObject -WorkloadType AzureVM
+$schedulePolicy.ScheduleRunFrequency = "Daily"
+$schedulePolicy.ScheduleRunTimes[0] = "2025-10-30T02:00:00Z"
+
+$retentionPolicy = Get-AzRecoveryServicesBackupRetentionPolicyObject -WorkloadType AzureVM
+$retentionPolicy.DailySchedule.DurationCountInDays = 30
+$retentionPolicy.WeeklySchedule.DurationCountInWeeks = 12
+$retentionPolicy.MonthlySchedule.DurationCountInMonths = 12
+$retentionPolicy.YearlySchedule.DurationCountInYears = 5
+
+New-AzRecoveryServicesBackupProtectionPolicy `
+    -Name "DailyBackupPolicy" `
+    -WorkloadType AzureVM `
+    -RetentionPolicy $retentionPolicy `
+    -SchedulePolicy $schedulePolicy `
+    -VaultId $vault.ID
+```
+
+**Types de Backup Policy :**
+
+**1. Standard Policy (Default) :**
+- Backup quotidien à heure fixe
+- Snapshots locaux (Instant Restore)
+- Transfer vers vault après 2-5 jours
+- Rétention : 30 jours à 10 ans
+
+**2. Enhanced Policy :**
+- Multiple backups par jour (jusqu'à 4x/jour)
+- Granularité horaire
+- Use case : Bases de données critiques
+
+**Configuration Policy via CLI :**
+```bash
+# Créer policy avec rétention 90 jours
+az backup policy create \
+  --resource-group myRG \
+  --vault-name myVault \
+  --name DailyBackup90Days \
+  --policy '{
+    "schedulePolicy": {
+      "schedulePolicyType": "SimpleSchedulePolicy",
+      "scheduleRunFrequency": "Daily",
+      "scheduleRunTimes": ["2025-10-30T02:00:00.000Z"]
+    },
+    "retentionPolicy": {
+      "retentionPolicyType": "LongTermRetentionPolicy",
+      "dailySchedule": {
+        "retentionTimes": ["2025-10-30T02:00:00.000Z"],
+        "retentionDuration": {
+          "count": 90,
+          "durationType": "Days"
+        }
+      }
+    }
+  }'
+```
+
+**Rétention Granulaire :**
+
+| Fréquence | Rétention Max | Use Case |
+|-----------|---------------|----------|
+| **Daily** | 9999 jours (27 ans) | Logs quotidiens |
+| **Weekly** | 5163 semaines (~99 ans) | Point de restauration hebdomadaire |
+| **Monthly** | 1188 mois (~99 ans) | Archivage mensuel |
+| **Yearly** | 99 ans | Conformité long terme |
+
+**Example - Policy Complexe :**
+```
+Daily   : 30 jours (dernier backup de chaque jour)
+Weekly  : 12 semaines (backup du dimanche)
+Monthly : 60 mois (backup du premier dimanche du mois)
+Yearly  : 10 ans (backup du 1er janvier)
+```
+
+#### Azure VM Backup - Configuration Complète
+
+**⚠️ Processus Important pour l'Examen**
+
+**Architecture Backup VM :**
+```
+Azure VM
+├── Snapshot Tier (Instant Restore)
+│   ├── Stockage : Managed Disks snapshots
+│   ├── Localisation : Même région que VM
+│   ├── Rétention : 1-5 jours (configurable)
+│   └── Restore : < 5 minutes
+│
+└── Vault-Standard Tier
+    ├── Stockage : Recovery Services Vault
+    ├── Localisation : Région vault
+    ├── Rétention : 30 jours à 99 ans
+    └── Restore : 30 minutes - 6 heures
+```
+
+**Activer Backup sur VM Existante :**
+
+```powershell
+# Sélectionner vault et policy
+$vault = Get-AzRecoveryServicesVault -ResourceGroupName "myRG" -Name "myVault"
+Set-AzRecoveryServicesVaultContext -Vault $vault
+
+$policy = Get-AzRecoveryServicesBackupProtectionPolicy `
+    -Name "DailyBackupPolicy" `
+    -VaultId $vault.ID
+
+# Activer backup sur VM
+Enable-AzRecoveryServicesBackupProtection `
+    -ResourceGroupName "myRG" `
+    -Name "myVM" `
+    -Policy $policy `
+    -VaultId $vault.ID
+```
+
+```bash
+# Via Azure CLI
+az backup protection enable-for-vm \
+  --resource-group myRG \
+  --vault-name myVault \
+  --vm myVM \
+  --policy-name DailyBackupPolicy
+```
+
+**Backup On-Demand (Immediate) :**
+```powershell
+# Trigger backup manuel
+$backupContainer = Get-AzRecoveryServicesBackupContainer `
+    -ContainerType AzureVM `
+    -FriendlyName "myVM" `
+    -VaultId $vault.ID
+
+$backupItem = Get-AzRecoveryServicesBackupItem `
+    -Container $backupContainer `
+    -WorkloadType AzureVM `
+    -VaultId $vault.ID
+
+Backup-AzRecoveryServicesBackupItem `
+    -Item $backupItem `
+    -VaultId $vault.ID `
+    -ExpiryDateTimeUTC (Get-Date).AddDays(30)
+```
+
+**Instant Restore Feature :**
+- Snapshots stockés localement (managed disk snapshots)
+- Restore ultra-rapide : 5-10 minutes
+- Rétention configurable : 1-5 jours
+- Coût : Snapshot storage (environ $0.05/GB/mois)
+
+**Configuration Instant Restore :**
+```powershell
+# Modifier rétention instant restore (1-5 jours)
+$policy = Get-AzRecoveryServicesBackupProtectionPolicy `
+    -Name "DailyBackupPolicy" `
+    -VaultId $vault.ID
+
+$policy.SnapshotRetentionInDays = 5
+
+Set-AzRecoveryServicesBackupProtectionPolicy `
+    -Policy $policy `
+    -VaultId $vault.ID
+```
+
+**Types de Restore VM :**
+
+**1. Create New VM (Restore as new) :**
+```powershell
+# Restaurer comme nouvelle VM
+$rp = Get-AzRecoveryServicesBackupRecoveryPoint `
+    -Item $backupItem `
+    -VaultId $vault.ID `
+    | Select-Object -First 1
+
+$restoreConfig = Get-AzRecoveryServicesBackupWorkloadRecoveryConfig `
+    -RecoveryPoint $rp `
+    -VaultId $vault.ID `
+    -TargetResourceGroupName "myRestoredRG"
+
+Restore-AzRecoveryServicesBackupItem `
+    -WLRecoveryConfig $restoreConfig `
+    -VaultId $vault.ID
+```
+
+**2. Restore Disks Only :**
+```powershell
+# Restaurer uniquement les disques
+$restoreConfig = Get-AzRecoveryServicesBackupWorkloadRecoveryConfig `
+    -RecoveryPoint $rp `
+    -RestoreAsUnmanagedDisks `
+    -VaultId $vault.ID `
+    -TargetStorageAccountName "myrestoresa"
+
+Restore-AzRecoveryServicesBackupItem `
+    -WLRecoveryConfig $restoreConfig `
+    -VaultId $vault.ID
+```
+
+**3. Replace Existing Disks :**
+```powershell
+# Remplacer disques VM existante
+$restoreConfig = Get-AzRecoveryServicesBackupWorkloadRecoveryConfig `
+    -RecoveryPoint $rp `
+    -RestoreOnlyOSDisk `
+    -VaultId $vault.ID
+
+Restore-AzRecoveryServicesBackupItem `
+    -WLRecoveryConfig $restoreConfig `
+    -VaultId $vault.ID
+```
+
+**4. File-Level Recovery (ILR - Item Level Recovery) :**
+```powershell
+# Monter recovery point comme disque virtuel
+$rp = Get-AzRecoveryServicesBackupRecoveryPoint `
+    -Item $backupItem `
+    -VaultId $vault.ID `
+    | Select-Object -First 1
+
+# Générer script de montage
+Get-AzRecoveryServicesBackupRPMountScript `
+    -RecoveryPoint $rp `
+    -VaultId $vault.ID
+
+# Le script PowerShell téléchargé montera le recovery point
+# Copier fichiers nécessaires manuellement
+# Puis démonter :
+
+Disable-AzRecoveryServicesBackupRPMountScript `
+    -RecoveryPoint $rp `
+    -VaultId $vault.ID
+```
 
 #### Changement de Vault
 
 **Pour Backup :**
-1. Arrêter backup dans vault actuel (RSV1)
-2. Configurer backup dans nouveau vault (RSV2)
+```powershell
+# 1. Arrêter backup dans vault actuel (RSV1)
+$vault1 = Get-AzRecoveryServicesVault -Name "RSV1"
+Set-AzRecoveryServicesVaultContext -Vault $vault1
+
+$backupItem = Get-AzRecoveryServicesBackupItem `
+    -BackupManagementType AzureVM `
+    -WorkloadType AzureVM `
+    -Name "myVM" `
+    -VaultId $vault1.ID
+
+Disable-AzRecoveryServicesBackupProtection `
+    -Item $backupItem `
+    -VaultId $vault1.ID `
+    -RemoveRecoveryPoints `
+    -Force
+
+# 2. Configurer backup dans nouveau vault (RSV2)
+$vault2 = Get-AzRecoveryServicesVault -Name "RSV2"
+Set-AzRecoveryServicesVaultContext -Vault $vault2
+
+$policy2 = Get-AzRecoveryServicesBackupProtectionPolicy `
+    -Name "DailyBackupPolicy" `
+    -VaultId $vault2.ID
+
+Enable-AzRecoveryServicesBackupProtection `
+    -ResourceGroupName "myRG" `
+    -Name "myVM" `
+    -Policy $policy2 `
+    -VaultId $vault2.ID
+```
+
+**⚠️ Important :** Changement de vault = Perte des recovery points existants
 
 **Pour Site Recovery :**
 - VM → Disaster Recovery → Replication Settings → Nouveau vault
+- Moins destructif que Backup (replication continuous)
 
-#### Types de Backup
-- **Azure VMs** : Snapshots dans région source
-- **On-premises** : MARS agent ou DPM/MABS
-- **SQL in Azure VM** : Application-consistent backups
-- **Azure Files** : Snapshots au niveau share
+#### Types de Backup Détaillés
+
+**1. Azure VMs - Application-Consistent Backups**
+
+**Consistency Levels :**
+
+| Type | Windows | Linux | Use Case |
+|------|---------|-------|----------|
+| **Application-consistent** | VSS enabled | Pre/Post scripts | Production databases |
+| **File-system consistent** | VSS failed | Default | File servers |
+| **Crash-consistent** | VM powered off | VM powered off | Graceful shutdown non requis |
+
+**VSS (Volume Shadow Copy Service) - Windows :**
+```
+1. VM Backup triggered
+2. Azure Backup calls VSS Writer
+3. Applications (SQL, Exchange) flush data to disk
+4. Snapshot created (application-consistent)
+5. Applications resume normal operations
+```
+
+**Pre/Post Scripts - Linux :**
+```bash
+# /etc/azure/pre-script.sh
+#!/bin/bash
+# Flush MySQL buffers avant snapshot
+mysql -u root -p${MYSQL_PASSWORD} -e "FLUSH TABLES WITH READ LOCK;"
+
+# /etc/azure/post-script.sh
+#!/bin/bash
+# Unlock MySQL après snapshot
+mysql -u root -p${MYSQL_PASSWORD} -e "UNLOCK TABLES;"
+```
+
+**Configuration Scripts :**
+```json
+{
+  "ScriptExecutionPolicy": "Custom",
+  "PreScriptLocation": "/etc/azure/pre-script.sh",
+  "PostScriptLocation": "/etc/azure/post-script.sh",
+  "PreScriptTimeout": "300",
+  "PostScriptTimeout": "300"
+}
+```
+
+**2. On-Premises Backup - MARS Agent**
+
+**MARS (Microsoft Azure Recovery Services) Agent :**
+- Backup fichiers/dossiers Windows vers Azure
+- Pas de backup système complet (OS)
+- Backup granulaire au niveau fichier
+
+**Installation MARS Agent :**
+```powershell
+# Télécharger MARS agent
+$url = "https://aka.ms/azurebackup_agent"
+$output = "C:\Temp\MARSAgentInstaller.exe"
+Invoke-WebRequest -Uri $url -OutFile $output
+
+# Installer
+Start-Process -FilePath $output -ArgumentList "/q /nu" -Wait
+
+# Télécharger vault credentials depuis portal
+# Azure Backup → Recovery Services Vault → Backup Infrastructure → Download Vault Credentials
+
+# Enregistrer serveur avec vault
+& "C:\Program Files\Microsoft Azure Recovery Services Agent\bin\wabadmin" `
+    Start RegisterWithVault `
+    -VaultCredentialsFilePath "C:\Temp\VaultCreds.vaultcredentials" `
+    -EncryptionPassphrase "MyStrongPassphrase123!"
+```
+
+**Configurer Backup Schedule :**
+```powershell
+# Via MARS agent GUI ou PowerShell
+$policy = New-OBPolicy
+
+# Ajouter fichiers/dossiers
+$fileSpec = New-OBFileSpec -FileSpec "C:\ImportantData" -Recurse
+
+Add-OBFileSpec -Policy $policy -FileSpec $fileSpec
+
+# Schedule (quotidien 2AM)
+$schedule = New-OBSchedule -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday -TimesOfDay 02:00
+
+Set-OBSchedule -Policy $policy -Schedule $schedule
+
+# Rétention (30 jours)
+$retention = New-OBRetentionPolicy -RetentionDays 30
+Set-OBRetentionPolicy -Policy $policy -RetentionPolicy $retention
+
+# Appliquer policy
+Set-OBPolicy -Policy $policy -Confirm:$false
+```
+
+**3. SQL Server in Azure VM - Database Backup**
+
+**⚠️ Backup Spécifique SQL**
+
+**Features :**
+- **Full, Differential, Log backups**
+- **Point-in-time restore** (15 minutes granularity)
+- **Auto-protection** : Nouvelles databases automatiquement sauvegardées
+- **Compression** : Backups compressés
+
+**Activer SQL Backup :**
+```powershell
+# Découvrir SQL instances
+Register-AzRecoveryServicesBackupContainer `
+    -ResourceGroupName "myRG" `
+    -VaultId $vault.ID `
+    -ContainerType AzureVMAppContainer `
+    -FriendlyName "myVM"
+
+# Lister SQL databases
+Get-AzRecoveryServicesBackupProtectableItem `
+    -Container $container `
+    -WorkloadType MSSQL `
+    -VaultId $vault.ID
+
+# Activer backup
+Enable-AzRecoveryServicesBackupProtection `
+    -ResourceGroupName "myRG" `
+    -Name "myVM;mssqlserver;myDB" `
+    -Policy $sqlPolicy `
+    -VaultId $vault.ID
+```
+
+**SQL Backup Policy Example :**
+```
+Full Backup    : Weekly (Sunday 2AM)
+Differential   : Daily (except Sunday, 2AM)
+Log Backup     : Every 15 minutes
+Rétention Full : 12 weeks
+Rétention Diff : 30 jours
+Rétention Log  : 7 jours
+```
+
+**4. Azure Files - Share Snapshots**
+
+**⚠️ Snapshots Natifs Azure Files**
+
+**Caractéristiques :**
+- Snapshots incrémentiels (seuls blocs modifiés)
+- Stockés dans même Storage Account
+- Pas de transfert vers vault
+- Rétention : 200 snapshots max par share
+
+**Activer Backup Azure Files :**
+```bash
+az backup protection enable-for-azurefileshare \
+  --resource-group myRG \
+  --vault-name myVault \
+  --storage-account myStorageAccount \
+  --azure-file-share myFileShare \
+  --policy-name DailyFileShareBackup
+```
+
+```powershell
+Enable-AzRecoveryServicesBackupProtection `
+    -StorageAccountName "mystorageaccount" `
+    -Name "myfileshare" `
+    -Policy $policy `
+    -VaultId $vault.ID
+```
+
+**Restore Azure Files :**
+```powershell
+# Restore entier share
+$rp = Get-AzRecoveryServicesBackupRecoveryPoint `
+    -Item $backupItem `
+    -VaultId $vault.ID `
+    | Select-Object -First 1
+
+Restore-AzRecoveryServicesBackupItem `
+    -RecoveryPoint $rp `
+    -TargetStorageAccountName "myrestoredsa" `
+    -TargetFileShareName "myrestoredshare" `
+    -VaultId $vault.ID
+
+# Restore fichiers individuels
+$rp = Get-AzRecoveryServicesBackupRecoveryPoint `
+    -Item $backupItem `
+    -VaultId $vault.ID
+
+# Portal : Browse files → Select files → Restore
+```
+
+#### Backup Reports et Monitoring
+
+**⚠️ Azure Backup Reports utilise Azure Monitor Workbooks**
+
+**Configuration Backup Reports :**
+
+```powershell
+# Configurer Diagnostic Settings pour envoyer backup data vers Log Analytics
+$vault = Get-AzRecoveryServicesVault -Name "myVault"
+
+Set-AzDiagnosticSetting `
+    -ResourceId $vault.ID `
+    -Name "BackupReports" `
+    -WorkspaceId "/subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.OperationalInsights/workspaces/myWorkspace" `
+    -Enabled $true `
+    -Category @("AzureBackupReport", "CoreAzureBackup", "AddonAzureBackupJobs", "AddonAzureBackupAlerts", "AddonAzureBackupPolicy", "AddonAzureBackupStorage", "AddonAzureBackupProtectedInstance")
+```
+
+**Via Azure CLI :**
+```bash
+az monitor diagnostic-settings create \
+  --name BackupReports \
+  --resource /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.RecoveryServices/vaults/myVault \
+  --workspace /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.OperationalInsights/workspaces/myWorkspace \
+  --logs '[
+    {"category": "AzureBackupReport", "enabled": true},
+    {"category": "CoreAzureBackup", "enabled": true},
+    {"category": "AddonAzureBackupJobs", "enabled": true},
+    {"category": "AddonAzureBackupAlerts", "enabled": true}
+  ]'
+```
+
+**Requêtes KQL - Backup Monitoring :**
+
+```kusto
+// Jobs de backup échoués dernières 24h
+AddonAzureBackupJobs
+| where TimeGenerated > ago(24h)
+| where JobStatus == "Failed"
+| project TimeGenerated, BackupItemFriendlyName, JobOperation, ErrorDetails
+| order by TimeGenerated desc
+
+// Taille totale des backups par VM
+AddonAzureBackupStorage
+| where TimeGenerated > ago(1d)
+| summarize TotalBackupSizeGB = sum(StorageConsumedInMBs)/1024 by BackupItemFriendlyName
+| order by TotalBackupSizeGB desc
+
+// Compliance backup (VMs sans backup configuré)
+CoreAzureBackup
+| where TimeGenerated > ago(7d)
+| where OperationName == "BackupItem"
+| summarize LastBackup = max(TimeGenerated) by BackupItemFriendlyName
+| where LastBackup < ago(2d)
+| project BackupItemFriendlyName, DaysSinceLastBackup = datetime_diff('day', now(), LastBackup)
+
+// Alertes backup critiques
+AddonAzureBackupAlerts
+| where TimeGenerated > ago(7d)
+| where AlertSeverity == "Critical"
+| summarize count() by AlertCode, BackupItemFriendlyName
+| order by count_ desc
+```
+
+**Métriques Importantes pour Monitoring :**
+
+| Métrique | Description | Seuil Critique |
+|----------|-------------|----------------|
+| **Backup Health** | % VMs avec backup réussi | < 95% |
+| **Restore Testing** | Dernière restore test | > 30 jours |
+| **Storage Growth** | Croissance mensuelle stockage | > 20%/mois |
+| **Job Duration** | Durée moyenne backup jobs | > 4 heures |
+| **Failed Jobs** | Jobs échoués dernières 24h | > 0 |
+
+**Alertes Backup Recommandées :**
+
+```powershell
+# Alerte pour backup jobs échoués
+$actionGroup = Get-AzActionGroup -ResourceGroupName "myRG" -Name "BackupAlerts"
+
+$condition = New-AzScheduledQueryRuleCondition `
+    -Query "AddonAzureBackupJobs | where JobStatus == 'Failed'" `
+    -TimeAggregation "Count" `
+    -Operator "GreaterThan" `
+    -Threshold 0
+
+New-AzScheduledQueryRule `
+    -ResourceGroupName "myRG" `
+    -Location "eastus" `
+    -Name "BackupJobsFailed" `
+    -DisplayName "Backup Jobs Failed Alert" `
+    -Description "Alert when backup jobs fail" `
+    -Severity 2 `
+    -Enabled $true `
+    -EvaluationFrequency "PT5M" `
+    -WindowSize "PT5M" `
+    -TargetResourceId "/subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.OperationalInsights/workspaces/myWorkspace" `
+    -Condition $condition `
+    -ActionGroupId $actionGroup.Id
+```
+
+#### Scénarios d'Examen - Azure Backup
+
+**⚠️ Questions Typiques AZ-104**
+
+| Scénario | Solution | Justification |
+|----------|----------|---------------|
+| **Vault dans West US, VM dans East US** | ❌ Impossible de configurer backup | Vault et ressources doivent être dans même région |
+| **100 VMs + 20 SQL databases à sauvegarder** | 2 policies minimum (1 VM, 1 SQL) | Policies séparées par workload type |
+| **Besoin restore VM < 5 minutes** | Instant Restore activé (rétention 1-5 jours) | Snapshots locaux pour restore rapide |
+| **Soft delete activé, backup supprimé** | Recovery possible 14 jours | Soft delete = protection 14 jours |
+| **Changer LRS vers GRS** | Impossible si backups existants | Storage redundancy modifiable AVANT premier backup |
+| **Backup SQL avec RPO 15 min** | SQL in Azure VM backup (log backups 15 min) | Point-in-time restore granularité 15 min |
+| **Restore uniquement certains fichiers VM** | ILR (Item Level Recovery) | Montage recovery point comme disque virtuel |
+| **On-premises Windows files vers Azure** | MARS Agent | Backup granulaire fichiers/dossiers |
+| **Supprimer Recovery Services Vault** | Stop backup tous items + disable soft delete | Vault ne peut être supprimé avec items protégés |
+| **DR vers autre région Azure** | GRS redundancy + Cross-region restore | Backup répliqué vers région secondaire |
+
+**Troubleshooting Backup - Erreurs Courantes :**
+
+| Erreur | Cause | Solution |
+|--------|-------|---------|
+| **UserErrorVmProvisioningStateFailed** | VM deallocated/stopped | Démarrer la VM |
+| **ExtensionSnapshotFailedNoNetwork** | VM sans accès Internet | Vérifier NSG outbound rules |
+| **UserErrorVaultMaximumResourcesReached** | Limite 1000 items par vault | Créer nouveau vault ou nettoyer ancien backup |
+| **BackupOperationFailed** | Permissions insuffisantes | VM Contributor + Backup Contributor sur vault |
+| **ExtensionInstallationFailure** | Extension conflict | Désinstaller extensions anciennes (MMA si AMA installé) |
+| **GuestAgentStatusUnavailable** | VM Agent non running | Installer/réparer Azure VM Agent |
+| **UserErrorBackupNotEnabledOnVm** | Backup jamais configuré | Enable backup via Recovery Services Vault |
+
+**Best Practices - Azure Backup :**
+
+✅ **À FAIRE :**
+- **GRS redundancy** pour données critiques (DR)
+- **Soft delete always-on** pour protection maximale
+- **Instant Restore 5 jours** pour recovery rapide
+- **Test régulièrement les restores** (au moins trimestriel)
+- **Backup reports** vers Log Analytics pour monitoring
+- **Action Groups** pour alertes backup échoués
+- **Tags** sur backup items pour organisation/coûts
+- **Rétention appropriée** : Conformité vs coûts
+- **Application-consistent backups** : VSS (Windows) ou Pre/Post scripts (Linux)
+
+❌ **À ÉVITER :**
+- Changer storage redundancy après premier backup
+- Oublier de tester les restores (backup = inutile si restore impossible)
+- Désactiver soft delete (protection accidentelle)
+- Backup sans monitoring/alertes
+- Utiliser Legacy agents (MMA) au lieu d'Azure Monitor Agent
+- Stocker tous recovery points à vie (coûts prohibitifs)
+- Un vault par VM (complexité management)
+
+**Calcul Coûts Backup - Estimation :**
+
+```
+Azure VM Backup Coût = Protected Instance + Storage
+
+Protected Instance :
+- VM < 50 GB : $10/mois
+- VM 50-500 GB : $20/mois  
+- VM > 500 GB : $30/mois
+
+Storage :
+- Snapshot tier : ~$0.05/GB/mois (instant restore 1-5 jours)
+- Vault-Standard tier : ~$0.05/GB/mois (rétention long terme)
+- GRS : 2x coût LRS
+
+Example :
+- 10 VMs @ 100 GB chacune
+- Protected instances : 10 x $20 = $200/mois
+- Storage (30 jours rétention, ~10% change rate) :
+  - Snapshots (5 jours) : 10 VMs x 100 GB x 0.05 x 5 jours / 30 jours = $8.33
+  - Vault (30 jours, incrémental) : 10 VMs x 100 GB x 0.10 x 30 jours x $0.05 = $150
+- Total : $200 + $8 + $150 = ~$358/mois
+```
+
+**RPO/RTO Backup - Service Level Agreements :**
+
+| Backup Type | RPO (Recovery Point Objective) | RTO (Recovery Time Objective) |
+|-------------|--------------------------------|------------------------------|
+| **Azure VM (Standard)** | 24 heures (backup quotidien) | 30 min - 6 heures (vault tier) |
+| **Azure VM (Instant Restore)** | 24 heures | < 5 minutes (snapshot tier) |
+| **SQL in Azure VM (Log backups)** | 15 minutes | 30 min - 2 heures |
+| **Azure Files** | 1-24 heures (configurable) | 5-30 minutes (snapshots) |
+| **MARS Agent** | 24 heures | 1-4 heures (selon taille) |
 
 ### 5.3 Azure Site Recovery
 
@@ -737,6 +1985,21 @@ Event | where TimeGenerated > ago(1h) | sort by TimeGenerated desc
 - [ ] **Azure Monitor** : Maximiser disponibilité et performance des applications
 - [ ] **Network Watcher** : Monitoring réseau uniquement (pas connectivité VMs)
 - [ ] **NSG vs Monitoring** : NSG = sécurité, pas monitoring
+- [ ] **Action Groups** : Notifications et actions automatiques (email, runbook, webhook, Logic App)
+- [ ] **Common Alert Schema** : Uniformité des alertes entre services
+- [ ] **Azure Monitor Agent (AMA)** : Agent recommandé (remplace MMA/OMS)
+- [ ] **Data Collection Rules (DCR)** : Configuration centralisée pour AMA
+- [ ] **VM Insights** : Performance monitoring + Service Map (Dependency Agent requis)
+- [ ] **Application Insights** : APM pour applications (part of Azure Monitor)
+- [ ] **Soft Delete** : Activé par défaut, rétention 14 jours
+- [ ] **Storage Redundancy** : LRS/ZRS/GRS, changeable AVANT premier backup uniquement
+- [ ] **Instant Restore** : Snapshots locaux, restore < 5 minutes, rétention 1-5 jours
+- [ ] **VSS** : Application-consistent backups pour Windows VMs
+- [ ] **MARS Agent** : Backup fichiers/dossiers on-premises vers Azure
+- [ ] **SQL in Azure VM** : Full/Diff/Log backups, point-in-time restore (15 min granularity)
+- [ ] **Azure Files Backup** : Share snapshots, 200 max par share
+- [ ] **Cross-region restore** : Possible si GRS activé sur vault
+- [ ] **ILR (Item Level Recovery)** : Restore fichiers individuels depuis VM backup
 
 ---
 
