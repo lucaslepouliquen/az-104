@@ -27,7 +27,7 @@ jobs:
     - name: Convert README to HTML
       run: |
         # Convert README.md to HTML with proper styling
-        markdown-it README.md --html --linkify --typographer -o index.html
+        markdown-it README.md --linkify --typographer -o index.html
         
     - name: Create index.html with proper HTML structure
       run: |
