@@ -1,7 +1,7 @@
 # AZ-104 Microsoft Azure Administrator - Guide Complet d'Examen
 
 ## 📋 Table des Matières
-1. [Manage Azure Identities and Governance (15-20%)](#1-manage-azure-identities-and-governance)
+1. [Manage Azure Identities and Governance (15-20%)](section1_identities_governance.md)
 2. [Implement and Manage Storage (15-20%)](#2-implement-and-manage-storage)
    - [Azure Data Lake Storage Gen2](#24-azure-data-lake-storage-gen2)
 3. [Deploy and Manage Azure Compute Resources (20-25%)](#3-deploy-and-manage-azure-compute-resources)

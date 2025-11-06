@@ -1,5 +1,31 @@
 # AZ-104 - Section 1: Manage Azure Identities and Governance (15-20%)
 
+## 📑 Table des matières
+
+- [1.1 Azure Active Directory (Azure AD)](#11-azure-active-directory-azure-ad)
+  - [Concepts Fondamentaux](#concepts-fondamentaux)
+  - [Utilisateurs et Groupes](#utilisateurs-et-groupes)
+  - [Membership Types](#membership-types)
+  - [Custom Domains](#custom-domains)
+  - [Licensing et Dynamic Groups](#licensing-et-dynamic-groups)
+  - [B2B Collaboration](#b2b-collaboration)
+  - [Azure AD Connect - Synchronisation Hybrid](#azure-ad-connect---synchronisation-hybrid)
+- [1.2 Role-Based Access Control (RBAC)](#12-role-based-access-control-rbac)
+  - [Rôles Built-in Essentiels](#rôles-built-in-essentiels)
+  - [Rôles Administratifs Azure AD](#rôles-administratifs-azure-ad)
+  - [Rôles Spécialisés](#rôles-spécialisés)
+  - [Scopes d'assignation RBAC - Détaillé](#scopes-dassignation-rbac---détaillé)
+- [1.3 Azure Policy](#13-azure-policy)
+  - [Concepts Clés](#concepts-clés)
+  - [Effects Principaux - Détaillé](#effects-principaux---détaillé)
+  - [Built-in Policies Courantes](#built-in-policies-courantes)
+- [1.4 Management Groups](#14-management-groups)
+  - [Hiérarchie](#hiérarchie)
+  - [Limites](#limites)
+  - [Resource Locks](#resource-locks)
+
+---
+
 ## 1.1 Azure Active Directory (Azure AD)
 
 ### Concepts Fondamentaux

@@ -18,11 +18,32 @@ The AZ-104 exam validates your skills as an Azure Administrator. It covers subsc
 
 ## 🎯 Exam Domains (Weight Distribution)
 
-### 1. Manage Azure identities and governance (15-20%)
-### 2. Implement and manage storage (15-20%)
-### 3. Deploy and manage Azure compute resources (20-25%)
-### 4. Configure and manage virtual networking (25-30%)
-### 5. Monitor and back up Azure resources (10-15%)
+### 1. [Manage Azure identities and governance (15-20%)](section1_identities_governance.md)
+- [Azure Active Directory (Azure AD / Entra ID)](section1_identities_governance.md#11-azure-active-directory-azure-ad)
+  - [Core Concepts](section1_identities_governance.md#concepts-fondamentaux)
+  - [Users and Groups](section1_identities_governance.md#utilisateurs-et-groupes)
+  - [Custom Domains](section1_identities_governance.md#custom-domains)
+  - [Licensing and Dynamic Groups](section1_identities_governance.md#licensing-et-dynamic-groups)
+  - [B2B Collaboration](section1_identities_governance.md#b2b-collaboration)
+  - [Azure AD Connect](section1_identities_governance.md#azure-ad-connect---synchronisation-hybrid)
+- [Role-Based Access Control (RBAC)](section1_identities_governance.md#12-role-based-access-control-rbac)
+  - [Built-in Essential Roles](section1_identities_governance.md#rôles-built-in-essentiels)
+  - [Azure AD Administrative Roles](section1_identities_governance.md#rôles-administratifs-azure-ad)
+  - [RBAC Assignment Scopes](section1_identities_governance.md#scopes-dassignation-rbac---détaillé)
+- [Azure Policy and Governance](section1_identities_governance.md#13-azure-policy)
+  - [Key Concepts](section1_identities_governance.md#concepts-clés)
+  - [Policy Effects](section1_identities_governance.md#effects-principaux---détaillé)
+- [Management Groups](section1_identities_governance.md#14-management-groups)
+  - [Hierarchy](section1_identities_governance.md#hiérarchie)
+  - [Resource Locks](section1_identities_governance.md#resource-locks)
+
+### 2. [Implement and manage storage (15-20%)](section2_storage.md)
+
+### 3. [Deploy and manage Azure compute resources (20-25%)](section3_compute.md)
+
+### 4. [Configure and manage virtual networking (25-30%)](section4_networking.md)
+
+### 5. [Monitor and back up Azure resources (10-15%)](section5_monitoring_backup.md)
 
 ---
 
@@ -137,11 +158,11 @@ Ce guide complet couvre tous les domaines de l'examen AZ-104 avec des exemples p
 
 ### 📚 Sections Principales
 
-1. **Azure Identities and Governance** - RBAC, Azure AD, Azure Policy, Tags
-2. **Azure Storage** - Blob Storage, File Storage, Storage Accounts
-3. **Azure Compute** - VMs, App Service, Container Instances
-4. **Virtual Networking** - VNets, NSGs, Load Balancers
-5. **Monitor and Backup** - Azure Monitor, Azure Backup
+1. **[Azure Identities and Governance](section1_identities_governance.md)** - RBAC, Azure AD, Azure Policy, Tags
+2. **[Azure Storage](section2_storage.md)** - Blob Storage, File Storage, Storage Accounts
+3. **[Azure Compute](section3_compute.md)** - VMs, App Service, Container Instances
+4. **[Virtual Networking](section4_networking.md)** - VNets, NSGs, Load Balancers
+5. **[Monitor and Backup](section5_monitoring_backup.md)** - Azure Monitor, Azure Backup
 
 ---
 
