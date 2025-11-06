@@ -13,31 +13,44 @@ L'examen AZ-104 valide vos compétences en tant qu'administrateur Azure. Il couv
 
 ## 🎯 Domaines d'examen (Répartition des poids)
 
-### 1. Gérer les identités et la gouvernance Azure (15-20%)
-- Azure Active Directory (Azure AD / Entra ID)
-- Contrôle d'accès basé sur les rôles (RBAC)
-- Azure Policy et gouvernance
-- Management Groups et abonnements
+### 1. [Gérer les identités et la gouvernance Azure (15-20%)](section1_identities_governance.md)
+- [Azure Active Directory (Azure AD / Entra ID)](section1_identities_governance.md#11-azure-active-directory-azure-ad)
+  - [Concepts Fondamentaux](section1_identities_governance.md#concepts-fondamentaux)
+  - [Utilisateurs et Groupes](section1_identities_governance.md#utilisateurs-et-groupes)
+  - [Custom Domains](section1_identities_governance.md#custom-domains)
+  - [Licensing et Dynamic Groups](section1_identities_governance.md#licensing-et-dynamic-groups)
+  - [B2B Collaboration](section1_identities_governance.md#b2b-collaboration)
+  - [Azure AD Connect](section1_identities_governance.md#azure-ad-connect---synchronisation-hybrid)
+- [Contrôle d'accès basé sur les rôles (RBAC)](section1_identities_governance.md#12-role-based-access-control-rbac)
+  - [Rôles Built-in Essentiels](section1_identities_governance.md#rôles-built-in-essentiels)
+  - [Rôles Administratifs Azure AD](section1_identities_governance.md#rôles-administratifs-azure-ad)
+  - [Scopes d'assignation RBAC](section1_identities_governance.md#scopes-dassignation-rbac---détaillé)
+- [Azure Policy et gouvernance](section1_identities_governance.md#13-azure-policy)
+  - [Concepts Clés](section1_identities_governance.md#concepts-clés)
+  - [Effects Principaux](section1_identities_governance.md#effects-principaux---détaillé)
+- [Management Groups et abonnements](section1_identities_governance.md#14-management-groups)
+  - [Hiérarchie](section1_identities_governance.md#hiérarchie)
+  - [Resource Locks](section1_identities_governance.md#resource-locks)
 
-### 2. Implémenter et gérer le stockage (15-20%)
+### 2. [Implémenter et gérer le stockage (15-20%)](section2_storage.md)
 - Comptes de stockage et types
 - **Types de blobs** : Block, Page, Append
 - Azure Files et partages de fichiers
 - Sécurité et réplication du stockage
 
-### 3. Déployer et gérer les ressources de calcul Azure (20-25%)
+### 3. [Déployer et gérer les ressources de calcul Azure (20-25%)](section3_compute.md)
 - Machines virtuelles et haute disponibilité
 - App Service et déploiement d'applications
 - Container Instances
 - ARM Templates et Infrastructure as Code
 
-### 4. Configurer et gérer la mise en réseau virtuelle (25-30%)
+### 4. [Configurer et gérer la mise en réseau virtuelle (25-30%)](section4_networking.md)
 - Réseaux virtuels (VNets) et sous-réseaux
 - Groupes de sécurité réseau (NSG)
 - Équilibrage de charge et passerelles d'application
 - Connectivité hybride (VPN, ExpressRoute)
 
-### 5. Surveiller et sauvegarder les ressources Azure (10-15%)
+### 5. [Surveiller et sauvegarder les ressources Azure (10-15%)](section5_monitoring_backup.md)
 - Azure Monitor et alertes
 - Log Analytics et KQL
 - Azure Backup et récupération
