@@ -41,9 +41,49 @@
 - **Guest User** : Utilisateur externe (Azure AD B2B)
 
 **Types de groupes :**
-- **Security Groups** : Gestion des permissions
-- **Microsoft 365 Groups** : Collaboration (Teams, SharePoint, etc.)
-- **Distribution Groups** : Listes de diffusion email
+
+**1. Security Groups**
+- **Gestion** : Azure AD Portal
+- **Usage** : Gestion des permissions RBAC, accès aux ressources Azure
+- **Membres** : Utilisateurs, devices, service principals, autres groupes
+- **Membership** : Assigned ou Dynamic
+
+**2. Microsoft 365 Groups**
+- **Gestion** : Azure AD Portal, Microsoft 365 Admin Center
+- **Usage** : Collaboration (Teams, SharePoint, Outlook, Planner)
+- **Membres** : Utilisateurs uniquement
+- **Membership** : Assigned ou Dynamic
+- **Caractéristiques** : Boîte mail partagée, calendrier, SharePoint site
+
+**3. Distribution Groups (Mail-Enabled Groups)**
+- **Gestion** : **Exchange Admin Center** (Exchange Online)
+- **⚠️ Important** : NE sont PAS gérés directement dans Azure AD Portal
+- **Usage** : Listes de diffusion email uniquement
+- **Membres** : Utilisateurs avec adresses email
+- **Membership** : Assigned uniquement (pas de dynamic)
+- **Limitation** : Ne peuvent PAS être utilisés pour les permissions Azure
+
+**⚠️ Point de Confusion Fréquent :**
+
+| Type | Géré dans Azure AD Portal? | Usage Permissions? | Usage Email? |
+|------|---------------------------|-------------------|-------------|
+| **Security Group** | ✅ Oui | ✅ Oui | ❌ Non* |
+| **Microsoft 365 Group** | ✅ Oui | ✅ Oui | ✅ Oui |
+| **Distribution Group** | ❌ Non (Exchange Admin) | ❌ Non | ✅ Oui |
+
+\*Peut être mail-enabled si configuré dans Exchange
+
+**Accès aux Distribution Groups :**
+```
+Exchange Admin Center → Recipients → Groups → Distribution list
+OU
+Microsoft 365 Admin Center → Teams & groups → Distribution lists
+```
+
+**⚠️ Pour l'examen AZ-104 :**
+- Distribution Groups = **Exchange Online**, pas Azure AD
+- Pour permissions Azure = Utiliser **Security Groups**
+- Pour collaboration + email = Utiliser **Microsoft 365 Groups**
 
 ### Membership Types
 - **Assigned** : Ajout manuel des membres
@@ -381,23 +421,121 @@ Root Management Group
 ```
 
 ### Limites
-- **6 niveaux** de profondeur maximum
-- **10,000 management groups** par tenant
-- Chaque subscription dans un seul management group
+
+**⚠️ Limites Techniques des Management Groups :**
+
+**Hiérarchie :**
+- **6 niveaux** de profondeur maximum (en dessous du root management group)
+- **Note** : Le Root Management Group n'est PAS compté dans les 6 niveaux
+- **Exemple** : Root → Level 1 → Level 2 → Level 3 → Level 4 → Level 5 → Level 6 (Subscriptions)
+
+**Capacité :**
+- **10,000 management groups** maximum par tenant Azure AD
+- **Note** : Cette limite inclut tous les management groups (root + enfants)
+
+**Contraintes :**
+- ✅ **Une subscription** peut appartenir à **un seul** management group
+- ✅ **Un management group** peut avoir **plusieurs** enfants (subscriptions ou MG)
+- ✅ **Un management group** ne peut avoir **qu'un seul** parent
+
+**Délai de propagation :**
+- **Policy assignments** : Jusqu'à 30 minutes pour propager
+- **RBAC assignments** : Jusqu'à 10 minutes pour propager
+
+**Référence** : [Azure Management Groups - Limits and recommendations](https://learn.microsoft.com/azure/governance/management-groups/overview)
 
 ### Resource Locks
 
-** Types de verrous et limitations :**
+**⚠️ Point d'Attention : Comprendre les Niveaux de Protection des Locks**
 
-**Delete Locks**
-- **Protection** : Bloque la suppression de ressources
-- **Ressources supportées** : Virtual machines, subscriptions, resource groups
-- **Ressources non supportées** : Management groups, storage account data
+**Types de Locks :**
+
+**1. Delete Lock (CanNotDelete)**
+- **Protection** : Empêche la suppression de la ressource
+- **Permet** : Modifications et lecture de la ressource
 - **Usage** : Protection contre suppression accidentelle
 
-** Points clés identifiés :**
-- **Delete locks** : Empêchent la suppression mais pas la modification
-- **Management groups** : Ne peuvent pas être verrouillés
-- **Storage account data** : Données non protégées par les locks
-- **Scope** : Applicable aux VMs, subscriptions, et resource groups uniquement
+**2. Read-Only Lock (ReadOnly)**
+- **Protection** : Empêche suppression ET modification
+- **Permet** : Lecture seule
+- **Usage** : Protection maximale (compliance, audit)
+
+**⚠️ CLARIFICATION IMPORTANTE : Storage Account Locks**
+
+**Ce que les locks protègent :**
+- ✅ **Le Storage Account lui-même** : Ne peut pas être supprimé (Delete Lock)
+- ✅ **Les propriétés du compte** : Configuration, SKU, réplication
+
+**Ce que les locks NE protègent PAS :**
+- ❌ **Les données DANS le Storage Account** : Blobs, fichiers, tables, queues
+- ❌ **Les opérations sur les données** : Upload, modification, suppression de blobs
+- ❌ **Les containers/shares** : Peuvent être créés/supprimés
+
+**Exemple concret :**
+```
+Storage Account avec Delete Lock :
+✅ Cannot delete the storage account
+❌ CAN delete/modify blobs inside the account
+❌ CAN delete containers
+❌ CAN upload/overwrite files
+```
+
+**Pour protéger les DONNÉES dans un Storage Account, utilisez :**
+
+**1. Immutable Storage (WORM - Write Once, Read Many)**
+```bash
+# Activer immutable storage sur un container
+az storage container immutability-policy create \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --period 365 \
+  --policy-mode Locked
+```
+- ✅ Blobs ne peuvent pas être modifiés ou supprimés
+- ✅ Protection contre ransomware
+- ✅ Compliance réglementaire (SEC 17a-4, FINRA, etc.)
+
+**2. Soft Delete**
+```bash
+# Activer soft delete pour blobs
+az storage account blob-service-properties update \
+  --account-name mystorageaccount \
+  --enable-delete-retention true \
+  --delete-retention-days 30
+```
+- ✅ Récupération de blobs supprimés (7-365 jours)
+- ✅ Protection contre suppression accidentelle
+- ✅ Snapshots et versions préservés
+
+**3. Versioning**
+```bash
+# Activer versioning
+az storage account blob-service-properties update \
+  --account-name mystorageaccount \
+  --enable-versioning true
+```
+- ✅ Historique complet des versions
+- ✅ Récupération de versions précédentes
+- ✅ Protection contre écrasement
+
+**Ressources Supportées pour Locks :**
+- ✅ **Virtual Machines** : Empêche suppression de la VM
+- ✅ **Subscriptions** : Protège toutes les ressources de la souscription
+- ✅ **Resource Groups** : Protège le groupe et toutes ses ressources
+- ✅ **Storage Accounts** : Protège le compte, PAS les données
+- ✅ **Networks, Databases, etc.** : Toutes ressources Azure
+
+**Ressources NON Supportées pour Locks :**
+- ❌ **Management Groups** : Cannot add locks to management groups
+- ❌ **Data inside resources** : Blobs, SQL rows, files
+
+**Scénarios d'Examen :**
+
+| Besoin | Solution | Raison |
+|--------|----------|--------|
+| **Empêcher suppression Storage Account** | **Delete Lock** | Protège la ressource |
+| **Protéger données (blobs) dans Storage** | **Immutable Storage + Soft Delete** | Locks ne protègent pas les données |
+| **Empêcher suppression accidentelle VM** | **Delete Lock** | Protection de la ressource VM |
+| **Protection contre ransomware** | **Immutable Storage** | Blobs non modifiables |
+| **Compliance réglementaire** | **Immutable Storage (Locked)** | WORM garantit intégrité |
 
