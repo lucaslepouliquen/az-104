@@ -34,18 +34,19 @@
 ### Types de Storage Accounts (Mise à jour 2024)
 
 **General Purpose v2 (GPv2) - Standard**
-- **Services** : Blobs, Files, Queues, Tables
-- **Performance** : Standard (HDD) ou Premium (SSD) selon le service
+- **Services** : Blobs, Files (Standard uniquement), Queues, Tables
+- **Performance** : Standard (HDD)
 - **Réplication** : Toutes les options (LRS, ZRS, GRS, GZRS, RA-GRS, RA-GZRS)
 - **Usage** : Polyvalent, recommandé pour la plupart des cas
-- **Nouveauté 2024** : Support des Premium File Shares (SSD) sur GPv2
+- **⚠️ Important** : GPv2 supporte uniquement les Standard File Shares (HDD). Pour Premium File Shares, utilisez un compte FileStorage.
 
-**Premium Block Blobs (BlobStorage)**
-- **Services** : Blobs uniquement (Block, Page, Append)
+**Premium Block Blobs (BlockBlobStorage)**
+- **Services** : Block Blobs uniquement
 - **Performance** : Premium (SSD) uniquement
 - **Réplication** : LRS, ZRS uniquement
-- **Usage** : Applications haute performance, bases de données
-- **Avantage** : IOPS élevées, latence faible
+- **Usage** : Applications haute performance, bases de données, workloads IoT
+- **Avantage** : IOPS élevées, latence faible (<10ms)
+- **⚠️ Note** : Ne pas confondre avec "BlobStorage" (ancien type de compte deprecated)
 
 **Premium File Shares (FileStorage)**
 - **Services** : Files uniquement
@@ -179,7 +180,7 @@
 | **LRS** | GRS, ZRS, GZRS, RA-GRS, RA-GZRS | ✅ Oui | Portal, CLI, PowerShell |
 | **GRS** | LRS, RA-GRS | ✅ Oui | Portal, CLI, PowerShell |
 | **ZRS** | GZRS, RA-GZRS | ✅ Oui | Portal, CLI, PowerShell |
-| **Premium_LRS** | GRS, ZRS | ❌ Non | Premium ne supporte que LRS/ZRS |
+| **Premium_LRS** | GRS, ZRS | ❌ Non | Conversion directe non supportée - Migration manuelle requise vers nouveau compte |
 
 **Méthodes d'Upgrade - Exemples Pratiques :**
 
@@ -516,6 +517,8 @@ Les Access Tiers permettent d'optimiser les coûts de stockage en fonction de la
 | **Cold** | Données rarement accédées (>90 jours) | Immédiate | $ Faible | $$$ Élevé | Ms | 90 jours | Oui |
 | **Archive** | Archivage long terme (>180 jours) | Après réhydratation | $ Très faible | $$$$ Très élevé | Heures | 180 jours | Oui |
 
+**⚠️ Note importante sur les prix** : Les prix indiqués ci-dessous sont approximatifs et basés sur la région US East. Les tarifs varient selon les régions Azure et sont sujets à changement. Consultez toujours la [page officielle de tarification Azure](https://azure.microsoft.com/pricing/details/storage/blobs/) pour les prix actuels.
+
 **1. Hot Tier - Données Actives**
 
 **Caractéristiques :**
@@ -791,7 +794,7 @@ $policy = Set-AzStorageAccountManagementPolicy `
 | **Cold** | $5 | $2.00 | $84.00 | 61% |
 | **Archive** | $2 | $10.00 + réhydratation | $144.00* | 33% |
 
-*Archive moins avantageux si accès fréquent
+**⚠️ Note** : Prix indicatifs pour US East. Archive moins avantageux si accès fréquent. Consultez la tarification officielle pour votre région.
 
 **Best Practices - Access Tiers**
 
@@ -832,15 +835,18 @@ $policy = Set-AzStorageAccountManagementPolicy `
 **Standard File Shares**
 - **Comptes** : General Purpose v2 (GPv2)
 - **Performance** : Standard (HDD)
-- **Capacité** : Jusqu'à 5 TiB par share
+- **Capacité** : 
+  - Par défaut : Jusqu'à 5 TiB par share
+  - Avec Large File Shares activé : Jusqu'à 100 TiB par share
 - **Usage** : Applications générales, partages basiques
+- **⚠️ Important** : Large File Shares doit être activé à la création du compte (irréversible)
 
 **Premium File Shares (SSD)**
-- **Comptes** : General Purpose v2 (GPv2) ou FileStorage
+- **Comptes** : FileStorage uniquement (compte dédié)
 - **Performance** : Premium (SSD)
-- **Capacité** : Jusqu'à 100 TiB par share (Standard) ou 256 TiB (v2 approvisionné)
+- **Capacité** : Jusqu'à 100 TiB par share (modèle standard)
 - **Usage** : Applications haute performance, bases de données
-- **Nouveauté 2024** : Modèle v2 approvisionné avec prévisibilité des coûts
+- **Nouveauté 2024** : Modèle v2 approvisionné permettant jusqu'à 256 TiB avec provisionnement flexible du stockage, IOPS et throughput
 
 ### Nouveautés 2024 - Fonctionnalités Avancées
 
@@ -852,8 +858,12 @@ $policy = Set-AzStorageAccountManagementPolicy `
 
 ### Capacités et Limites (Mise à jour 2024)
 
-- **Standard** : Maximum 5 TB par share
-- **Premium** : Maximum 100 TB par share (Standard) ou 256 TiB (v2 approvisionné)
+- **Standard File Shares** : 
+  - Par défaut : Maximum 5 TiB par share
+  - Avec Large File Shares activé : Maximum 100 TiB par share
+- **Premium File Shares** : 
+  - Modèle standard : Maximum 100 TiB par share
+  - Modèle v2 approvisionné : Jusqu'à 256 TiB par share
 - **Azure Import/Export** : Support Blob Storage et Azure Files
 - **Nouveauté** : Support des identités managées pour Azure File Sync
 
