@@ -464,7 +464,7 @@ curl -I https://mystorageaccount.blob.core.windows.net/mycontainer
 **2. Page Blobs**
 - **Usage principal** : Disques de machines virtuelles Azure (VHD/VHDX)
 - **Structure** : Pages de 512 octets, accès aléatoire optimisé
-- **Taille maximale** : 8 TB par page blob
+- **Taille maximale** : 8 TiB par page blob
 - **Performance** : Optimisé pour opérations de lecture/écriture aléatoires fréquentes
 - **Cas d'usage typiques** :
   - Disques OS et disques de données des VMs
@@ -475,7 +475,7 @@ curl -I https://mystorageaccount.blob.core.windows.net/mycontainer
 **3. Append Blobs**
 - **Usage principal** : Données ajoutées séquentiellement (logs, audit trails)
 - **Structure** : Optimisé pour opérations d'ajout uniquement
-- **Taille maximale** : 195 GB par append blob
+- **Taille maximale** : 195 GiB par append blob
 - **Limitation** : Pas de modification des données existantes, ajout uniquement
 - **Cas d'usage typiques** :
   - Fichiers de logs d'applications
