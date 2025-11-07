@@ -303,6 +303,8 @@ public static async Task Run(
 
 **4. Partner Solutions - SIEM Tiers**
 
+**⚠️ Note Importante :** Les Partner Solutions (Datadog, Elastic, Splunk) s'intègrent généralement via **Event Hub** comme intermédiaire ou via des ressources Azure natives spécifiques (ex: `Microsoft.Datadog/monitors`), plutôt que directement via Diagnostic Settings standard.
+
 **Partenaires Disponibles :**
 - **Datadog** : APM et infrastructure monitoring
 - **Elastic (Elasticsearch)** : Search, analytics, visualization
@@ -310,18 +312,42 @@ public static async Task Run(
 - **Splunk** : Enterprise SIEM
 - **Sumo Logic** : Cloud-native SIEM
 
-**Configuration :**
+**Configuration Recommandée - Via Event Hub :**
 ```bash
-# Liste des partenaires disponibles
-az monitor diagnostic-settings subscription list-categories
+# Créer Event Hub pour intégration SIEM
+az eventhubs namespace create \
+  --resource-group myRG \
+  --name mySIEMEventHub \
+  --location eastus \
+  --sku Standard
 
-# Configuration vers Partner Solution (exemple Datadog)
+az eventhubs eventhub create \
+  --resource-group myRG \
+  --namespace-name mySIEMEventHub \
+  --name diagnostics-to-siem
+
+# Configurer Diagnostic Settings vers Event Hub
 az monitor diagnostic-settings create \
-  --name VMDiagToDatadog \
+  --name VMDiagToSIEM \
   --resource /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM \
-  --marketplace-partner-id /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Datadog/monitors/myDatadogMonitor \
+  --event-hub mySIEMEventHub \
+  --event-hub-rule /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.EventHub/namespaces/mySIEMEventHub/authorizationRules/RootManageSharedAccessKey \
   --logs '[{"category":"Administrative","enabled":true}]' \
   --metrics '[{"category":"AllMetrics","enabled":true}]'
+
+# Configurer le SIEM pour consommer depuis Event Hub
+```
+
+**Configuration Alternative - Ressources Natives (Datadog Example) :**
+```bash
+# Créer ressource Datadog dans Azure
+az datadog monitor create \
+  --resource-group myRG \
+  --name myDatadogMonitor \
+  --location eastus \
+  --sku-name "Linked"
+
+# L'intégration se configure ensuite dans le portail Datadog
 ```
 
 **Avantages :**
@@ -410,6 +436,10 @@ Azure Resource (VM, Storage, NSG, etc.)
 **Network Security Group (NSG) :**
 - NSG Flow Logs (version 1 ou 2)
 - Network Watcher requis
+- **Destinations disponibles** :
+  - **Storage Account** : Archivage des logs (méthode traditionnelle)
+  - **Log Analytics Workspace** : Envoi direct sans Storage Account (depuis 2023)
+  - **Storage Account + Log Analytics** : Combinaison pour archivage + analyse
 
 **Azure SQL Database :**
 - SQLInsights, QueryStoreRuntimeStatistics
@@ -654,6 +684,7 @@ Set-AzVMExtension `
   -Publisher "Microsoft.Azure.Monitor" `
   -ExtensionType "AzureMonitorWindowsAgent" `
   -TypeHandlerVersion "1.0" `
+  -Location "East US" `
   -EnableAutomaticUpgrade $true
 
 # Linux VM
@@ -664,6 +695,7 @@ Set-AzVMExtension `
   -Publisher "Microsoft.Azure.Monitor" `
   -ExtensionType "AzureMonitorLinuxAgent" `
   -TypeHandlerVersion "1.0" `
+  -Location "East US" `
   -EnableAutomaticUpgrade $true
 ```
 
@@ -780,10 +812,13 @@ Remove-AzVMExtension `
 VM Insights fournit un monitoring complet des VMs avec métriques de performance, dépendances d'applications et health monitoring.
 
 **Composants Requis :**
-1. **Azure Monitor Agent** ou **Log Analytics Agent**
-2. **Dependency Agent** (pour Service Map)
-3. **Log Analytics Workspace**
-4. **Data Collection Rule** (si AMA)
+1. **Azure Monitor Agent (AMA)** - Recommandé
+   - **Avec AMA moderne** : Dependency Agent intégré (pas d'extension séparée nécessaire)
+   - **Avec Log Analytics Agent (Legacy)** : Dependency Agent requis comme extension séparée
+2. **Log Analytics Workspace**
+3. **Data Collection Rule (DCR)** - Si utilisation d'AMA
+
+**⚠️ Note Importante :** Avec Azure Monitor Agent moderne, les fonctionnalités de dépendances (Service Map) sont intégrées directement. L'extension Dependency Agent séparée n'est requise que si vous utilisez encore le Legacy Log Analytics Agent (MMA/OMS).
 
 **Activation via Portal :**
 1. VM → **Monitoring** → **Insights**
@@ -1012,7 +1047,7 @@ $vault = Get-AzRecoveryServicesVault `
   -ResourceGroupName "myRG" `
   -Name "myVault"
 
-# Configurer Storage Redundancy (doit être fait AVANT premier backup)
+# Configurer Storage Redundancy
 Set-AzRecoveryServicesBackupProperty `
   -Vault $vault `
   -BackupStorageRedundancy GeoRedundant
@@ -1026,7 +1061,14 @@ Set-AzRecoveryServicesBackupProperty `
 | **ZRS** | 3 copies (3 zones) | Non | Production, haute disponibilité | Moyen |
 | **GRS** | 6 copies (primaire + secondaire) | Oui | Données critiques, DR | Élevé |
 
-**⚠️ Important :** Storage Redundancy ne peut être changé qu'AVANT le premier backup.
+**⚠️ Important - Changement de Storage Redundancy :**
+- **Recommandation** : Configurer AVANT le premier backup pour éviter les complications
+- **Depuis 2023** : Microsoft permet le changement APRÈS le premier backup avec limitations :
+  - Fenêtres de maintenance spécifiques requises
+  - Peut nécessiter l'arrêt temporaire des backups
+  - Certaines restrictions selon le type de workload
+  - Processus plus complexe et risqué
+- **Best Practice** : Toujours planifier la redundancy correcte dès la création du vault
 
 **Suppression du Vault - Procédure Correcte :**
 
