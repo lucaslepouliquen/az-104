@@ -111,20 +111,6 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - **MX** : Alternative acceptable
 - Exemple : `MS=ms12345678` dans un enregistrement TXT
 
-### Licensing et Dynamic Groups
-
-** Processus d'assignation automatique de licences :**
-1. **Créer un groupe de sécurité dynamique** basé sur des attributs personnalisés
-2. **Configurer les règles** du groupe dynamique
-3. **Ajouter le groupe à un groupe de licences** pour synchronisation automatique
-4. **Tous les utilisateurs** du groupe reçoivent automatiquement la licence
-
-** Points clés identifiés :**
-- **Dynamic security groups** : Obligatoires pour assignation automatique
-- **Custom attributes** : Base des règles de groupe
-- **License groups** : Synchronisation automatique requise
-- **Automatic assignment policies** : Non utilisées pour les licences
-
 ### B2B Collaboration
 
 ** Configuration des paramètres de collaboration externe :**
@@ -164,51 +150,89 @@ user.department, user.country, user.city, user.jobTitle, user.userPrincipalName
 - ❌ Permissions SharePoint
 - ❌ Rôles Azure AD (ils doivent être réassignés)
 
-**Actions nécessaires après synchronisation :**
+**Gestion des Licences après Synchronisation :**
+
+**⚠️ Important :** Les licences doivent être assignées manuellement ou automatiquement après synchronisation.
+
+**Méthode 1 - Assignation Manuelle :**
 ```powershell
-# 1. Assigner des licences via PowerShell
+# Via PowerShell
 Connect-MsolService
 Set-MsolUser -UserPrincipalName "user@contoso.com" -UsageLocation "FR"
 Set-MsolUserLicense -UserPrincipalName "user@contoso.com" -AddLicenses "contoso:ENTERPRISEPACK"
 
-# 2. Ou via Azure Portal
+# Ou via Azure Portal
 # Azure AD → Users → Select user → Licenses → Add assignments
 
-# 3. Ou via Microsoft 365 Admin Center
+# Ou via Microsoft 365 Admin Center
 # Users → Active users → Select user → Manage product licenses
 ```
 
-**Best Practice - Assignation automatique de licences :**
-1. Créer un groupe de sécurité dynamique basé sur des attributs
-2. Assigner des licences au groupe (Group-based licensing)
-3. Les nouveaux utilisateurs synchronisés reçoivent automatiquement les licences
+**Méthode 2 - Assignation Automatique (Recommandée) :**
+
+**Processus d'assignation automatique de licences :**
+1. **Créer un groupe de sécurité dynamique** basé sur des attributs personnalisés
+2. **Configurer les règles** du groupe dynamique
+3. **Assigner des licences au groupe** (Group-based licensing)
+4. **Les nouveaux utilisateurs synchronisés** reçoivent automatiquement les licences
 
 ```powershell
 # Exemple de règle de groupe dynamique
 (user.department -eq "Sales") -and (user.usageLocation -eq "FR")
 ```
 
+**Points clés :**
+- **Dynamic security groups** : Obligatoires pour assignation automatique
+- **Custom attributes** : Base des règles de groupe
+- **Group-based licensing** : Synchronisation automatique
+- **Usage Location** : Doit être défini avant assignation de licence
+
 ## 1.2 Role-Based Access Control (RBAC)
 
 ### Rôles Built-in Essentiels
-- **Owner** : Accès complet + gestion des accès
-- **Contributor** : Accès complet sauf gestion des accès
-- **Reader** : Lecture seule
-- **User Access Administrator** : Gestion des accès uniquement
 
-### Rôles Administratifs Azure AD
+**⚠️ Principe du Moindre Privilège :** Toujours utiliser le rôle avec le minimum de permissions requis
+
+**Rôles Azure RBAC (Gestion des Ressources) :**
+
+**Owner**
+- **Permissions** : Accès complet à toutes les ressources
+- **Capacités** : Création, modification, suppression + délégation d'accès
+- **Usage** : Administration complète avec gestion des accès
+- **Scope** : Ressources Azure (VMs, Storage, Networks, etc.)
+
+**Contributor**
+- **Permissions** : Accès complet aux ressources
+- **Limitation** : ❌ Ne peut PAS déléguer l'accès à d'autres utilisateurs
+- **Usage** : Développement et administration des ressources sans gestion des accès
+- **Scope** : Tous types de ressources Azure
+
+**Reader**
+- **Permissions** : Lecture seule
+- **Limitation** : ❌ Aucune action de modification autorisée
+- **Usage** : Monitoring, audit, consultation
+- **Scope** : Visualisation des ressources existantes
+
+**User Access Administrator**
+- **Permissions** : Gestion des accès uniquement
+- **Limitation** : ❌ Ne peut PAS créer/modifier les ressources
+- **Usage** : Délégation des permissions RBAC
+- **Scope** : Assignations de rôles uniquement
+
+### Rôles Administratifs Azure AD (Gestion des Identités)
 
 **User Administrator**
 - **Permissions** : Création et gestion des utilisateurs et groupes
 - **Capacités** : Gestion des tickets de support, monitoring de la santé des services
 - **Usage** : Administration dédiée aux utilisateurs sans privilèges excessifs
 - **Scope** : Gestion des identités uniquement
+- **✅ Recommandé** : Pour gestion quotidienne des utilisateurs
 
 **Global Administrator**
 - **Permissions** : Accès complet à toutes les fonctionnalités Azure AD
 - **Capacités** : Plus de permissions que nécessaire pour la gestion basique
 - **Usage** : Administration complète du tenant
-- **Principe** : Utiliser le rôle le moins privilégié possible
+- **⚠️ Attention** : Utiliser avec parcimonie, trop de permissions pour tâches simples
 
 **Billing Administrator**
 - **Permissions** : Gestion des aspects financiers et de facturation
@@ -216,43 +240,29 @@ Set-MsolUserLicense -UserPrincipalName "user@contoso.com" -AddLicenses "contoso:
 - **Usage** : Administration financière
 - **Scope** : Facturation et finances uniquement
 
-**Service Administrator**
-- **Type** : Rôle classique (Classic)
+**Service Administrator (Classic)**
+- **Type** : Rôle classique (Legacy)
 - **Permissions** : Accès complet aux services Azure
-- **Usage** : Rôle legacy, non requis pour gestion utilisateurs
-- **Note** : Remplacé par les rôles RBAC modernes
-
-** Point clé identifié :** Principe du moindre privilège
-- **User Administrator** : Suffisant pour gestion utilisateurs et groupes
-- **Global Administrator** : Trop de permissions pour tâches simples
-- **Règle** : Toujours utiliser le rôle avec le minimum de permissions requis
+- **⚠️ Deprecated** : Remplacé par les rôles RBAC modernes
+- **Usage** : Non recommandé pour nouvelles installations
 
 ### Rôles Spécialisés
-- **Virtual Machine Contributor** : Gestion des VMs
+
+**Rôles Ressources Spécifiques :**
+- **Virtual Machine Contributor** : Gestion complète des VMs
 - **Storage Account Contributor** : Gestion des comptes de stockage
 - **Network Contributor** : Gestion des ressources réseau
+- **API Management Service Contributor** : Configuration et maintenance des APIs
 
-** Différenciation des rôles essentiels :**
+**⚠️ Comparaison pour l'Examen :**
 
-**Contributor**
-- **Création et gestion** : Tous types de ressources
-- **Limitation** : Ne peut pas déléguer l'accès à d'autres utilisateurs
-- **Usage** : Développement et administration des ressources
-
-**Reader**
-- **Visualisation** : Ressources Azure existantes
-- **Aucune action** : Pas d'actions autorisées sur les ressources
-- **Usage** : Monitoring et audit
-
-**API Management Service Contributor**
-- **Scope limité** : Services API Management et APIs uniquement
-- **Gestion spécialisée** : Configuration et maintenance des APIs
-- **Usage** : Administration des services API
-
-**Owner**
-- **Accès complet** : Toutes les ressources
-- **Délégation** : Possibilité de déléguer l'accès à d'autres utilisateurs
-- **Usage** : Administration complète avec gestion des accès
+| Besoin | Rôle Approprié | Raison |
+|--------|---------------|--------|
+| Gérer utilisateurs et groupes | **User Administrator** | Moindre privilège suffisant |
+| Créer et gérer VMs | **Contributor** ou **VM Contributor** | Pas besoin de gestion d'accès |
+| Consulter les ressources | **Reader** | Lecture seule |
+| Gérer les permissions | **Owner** ou **User Access Administrator** | Délégation requise |
+| Administration complète tenant | **Global Administrator** | Privilèges maximum |
 
 ### Scopes d'assignation RBAC - Détaillé
 
@@ -320,11 +330,6 @@ az role assignment list --assignee user@contoso.com --output table
 # Vérifier les permissions sur une ressource
 az role assignment list --scope "/subscriptions/xxx/resourceGroups/myRG"
 ```
-
-** Erreur identifiée :** Root Management Group
-- **Aucun accès par défaut** au root management group
-- Seuls les **Global Administrators** peuvent s'élever
-- Process : Global Admin → "Access management for Azure resources" → Assign roles
 
 ## 1.3 Azure Policy
 
@@ -420,7 +425,7 @@ Root Management Group
     └── Test Subscription 1
 ```
 
-### Limites
+### Limites et Accès
 
 **⚠️ Limites Techniques des Management Groups :**
 
@@ -437,6 +442,15 @@ Root Management Group
 - ✅ **Une subscription** peut appartenir à **un seul** management group
 - ✅ **Un management group** peut avoir **plusieurs** enfants (subscriptions ou MG)
 - ✅ **Un management group** ne peut avoir **qu'un seul** parent
+
+**⚠️ Accès au Root Management Group :**
+- **Aucun accès par défaut** au root management group
+- Seuls les **Global Administrators** peuvent s'élever pour obtenir l'accès
+- **Processus** : 
+  1. Global Admin → Azure Portal
+  2. Azure AD → Properties
+  3. "Access management for Azure resources" → Enable
+  4. Assign roles au root management group
 
 **⚠️ Délais de Propagation (RBAC et Policies) :**
 
