@@ -438,9 +438,20 @@ Root Management Group
 - ✅ **Un management group** peut avoir **plusieurs** enfants (subscriptions ou MG)
 - ✅ **Un management group** ne peut avoir **qu'un seul** parent
 
-**Délai de propagation :**
-- **Policy assignments** : Jusqu'à 30 minutes pour propager
-- **RBAC assignments** : Jusqu'à 10 minutes pour propager
+**⚠️ Délais de Propagation (RBAC et Policies) :**
+
+Ces délais concernent **uniquement** les assignations RBAC et Policy, **PAS les Resource Locks**.
+
+| Type d'assignation | Délai de propagation | Scope |
+|-------------------|---------------------|-------|
+| **RBAC assignments** | Jusqu'à 10 minutes | Management Groups, Subscriptions, Resource Groups |
+| **Policy assignments** | Jusqu'à 30 minutes | Management Groups, Subscriptions, Resource Groups |
+| **Resource Locks** | ✅ **Immédiat** | Subscriptions, Resource Groups, Resources |
+
+**⚠️ Important pour l'examen :**
+- **Locks** : Effectifs **immédiatement** après création
+- **RBAC** : Peut prendre jusqu'à **10 minutes** pour que les permissions soient actives
+- **Policies** : Peut prendre jusqu'à **30 minutes** pour évaluation de la conformité
 
 **Référence** : [Azure Management Groups - Limits and recommendations](https://learn.microsoft.com/azure/governance/management-groups/overview)
 
