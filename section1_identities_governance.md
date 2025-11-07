@@ -471,6 +471,45 @@ Ces délais concernent **uniquement** les assignations RBAC et Policy, **PAS les
 - **Permet** : Lecture seule
 - **Usage** : Protection maximale (compliance, audit)
 
+**⚠️ Héritage des Locks - Point Critique pour l'Examen :**
+
+Les locks suivent un principe d'**héritage hiérarchique** :
+
+**Delete Lock sur Resource Group :**
+```
+Resource Group avec Delete Lock
+├── ✅ Empêche suppression du Resource Group lui-même
+├── ✅ Empêche AUSSI suppression des ressources enfants (héritage)
+└── ✅ PERMET modifications des ressources enfants
+```
+
+**Exemple concret :**
+```
+RG "Production-RG" avec Delete Lock :
+✅ Cannot delete the Resource Group
+✅ Cannot delete VM1 in Production-RG (inherited)
+✅ Cannot delete Storage Account in Production-RG (inherited)
+✅ CAN modify/stop VM1
+✅ CAN upload/delete blobs in Storage Account
+✅ CAN change VM size, add disks, etc.
+```
+
+**Hiérarchie d'héritage des Locks :**
+
+| Scope Lock | Impact sur Enfants | Exemple |
+|-----------|-------------------|---------|
+| **Subscription Lock** | ✅ S'applique à **tous** les Resource Groups et ressources | Lock sur Subscription → Protège toutes les ressources |
+| **Resource Group Lock** | ✅ S'applique à **toutes** les ressources du RG | Lock sur RG → Protège toutes les VMs, Storage, etc. |
+| **Resource Lock** | ❌ S'applique **uniquement** à cette ressource | Lock sur VM1 → Protège uniquement VM1 |
+
+**⚠️ Piège d'examen classique :**
+
+| Question | Réponse Incorrecte ❌ | Réponse Correcte ✅ |
+|----------|----------------------|---------------------|
+| "Delete Lock sur RG permet de supprimer les ressources ?" | "Oui, le lock ne concerne que le RG" | "Non, le lock est hérité par toutes les ressources enfants" |
+| "Delete Lock sur RG empêche de modifier les VMs ?" | "Oui, tout est bloqué" | "Non, on peut modifier, juste pas supprimer" |
+| "Comment supprimer une VM dans un RG avec Delete Lock ?" | "Impossible" | "Retirer le lock du RG d'abord, puis supprimer" |
+
 **⚠️ CLARIFICATION IMPORTANTE : Storage Account Locks**
 
 **Ce que les locks protègent :**
@@ -494,17 +533,41 @@ Storage Account avec Delete Lock :
 **Pour protéger les DONNÉES dans un Storage Account, utilisez :**
 
 **1. Immutable Storage (WORM - Write Once, Read Many)**
+
+**⚠️ Note** : La syntaxe CLI peut varier selon la version. Vérifiez toujours avec `az storage container immutability-policy --help`
+
 ```bash
-# Activer immutable storage sur un container
+# Option 1: Créer une politique d'immutabilité time-based (période de rétention)
 az storage container immutability-policy create \
   --account-name mystorageaccount \
   --container-name mycontainer \
   --period 365 \
-  --policy-mode Locked
+  --account-key <storage-key>
+
+# Option 2: Verrouiller la politique (mode Locked - irréversible)
+az storage container immutability-policy lock \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --if-match "<etag>" \
+  --account-key <storage-key>
+
+# Option 3: Via Account-level (recommandé pour 2024+)
+az storage account blob-service-properties update \
+  --account-name mystorageaccount \
+  --resource-group myRG \
+  --enable-versioning true \
+  --default-service-version "2021-06-08"
 ```
-- ✅ Blobs ne peuvent pas être modifiés ou supprimés
-- ✅ Protection contre ransomware
-- ✅ Compliance réglementaire (SEC 17a-4, FINRA, etc.)
+
+**Modes de politique :**
+- **Unlocked** : Test mode, peut être modifié/supprimé
+- **Locked** : Production mode, **irréversible**, compliance garantie
+
+**Caractéristiques :**
+- ✅ Blobs ne peuvent pas être modifiés ou supprimés pendant la période de rétention
+- ✅ Protection contre ransomware et suppression accidentelle
+- ✅ Compliance réglementaire (SEC 17a-4(f), FINRA 4511, CFTC, etc.)
+- ✅ Legal Hold disponible pour rétention indéfinie
 
 **2. Soft Delete**
 ```bash
