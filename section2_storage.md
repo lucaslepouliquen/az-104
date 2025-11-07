@@ -832,13 +832,13 @@ $policy = Set-AzStorageAccountManagementPolicy `
 **Standard File Shares**
 - **Comptes** : General Purpose v2 (GPv2)
 - **Performance** : Standard (HDD)
-- **Capacité** : Jusqu'à 5 TB par share
+- **Capacité** : Jusqu'à 5 TiB par share
 - **Usage** : Applications générales, partages basiques
 
 **Premium File Shares (SSD)**
 - **Comptes** : General Purpose v2 (GPv2) ou FileStorage
 - **Performance** : Premium (SSD)
-- **Capacité** : Jusqu'à 100 TB par share (Standard) ou 256 TiB (v2 approvisionné)
+- **Capacité** : Jusqu'à 100 TiB par share (Standard) ou 256 TiB (v2 approvisionné)
 - **Usage** : Applications haute performance, bases de données
 - **Nouveauté 2024** : Modèle v2 approvisionné avec prévisibilité des coûts
 
