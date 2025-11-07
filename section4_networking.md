@@ -18,8 +18,8 @@ VNet Peering établit une connexion privée entre deux réseaux virtuels Azure, 
 
 | Type | Portée | Latence | Coût | Use Case |
 |------|--------|---------|------|----------|
-| **Regional VNet Peering** | Même région Azure | Ultra-faible | Gratuit (ingress) | Apps multi-tier, partage de ressources |
-| **Global VNet Peering** | Régions différentes | Faible | Facturé (ingress + egress) | Multi-région, DR, geo-distribution |
+| **Regional VNet Peering** | Même région Azure | Ultra-faible | $0.01/GB (ingress + egress) | Apps multi-tier, partage de ressources |
+| **Global VNet Peering** | Régions différentes | Faible | $0.035/GB (ingress + egress) | Multi-région, DR, geo-distribution |
 
 **Caractéristiques Clés :**
 - **Traffic** : 100% privé, transit par backbone Azure (pas d'Internet)
@@ -205,8 +205,8 @@ VNet A ←→ VNet B ←→ VNet C
 - **Bande passante** : Identique à celle d'un VNet local (pas de limite imposée par le peering)
 - **Latence** : Ultra-faible (< 1ms en regional, quelques ms en global)
 - **Throughput** : Dépend uniquement des VM sizes
-- **Coût Regional** : Ingress gratuit, Egress gratuit dans la même région
-- **Coût Global** : Ingress et Egress facturés ($0.01-0.035/GB selon zones)
+- **Coût Regional** : $0.01/GB pour ingress et egress
+- **Coût Global** : $0.035/GB pour ingress et egress (selon zones)
 
 **7. Troubleshooting VNet Peering**
 
@@ -402,7 +402,7 @@ Can be used with subnet or NIC
 
 | Caractéristique | Basic | Standard |
 |-----------------|-------|----------|
-| **Backend pool size** | 300 VMs | 1000 VMs |
+| **Backend pool size** | 300 VMs (avec Availability Set), 100 VMs (sans) | 1000 VMs |
 | **Health probes** | TCP, HTTP | TCP, HTTP, HTTPS |
 | **Availability Zones** | ❌ Non | ✅ Oui |
 | **SLA** | Aucun | 99.99% |
@@ -411,8 +411,12 @@ Can be used with subnet or NIC
 | **Sécurité** | Open par défaut | Fermé par défaut |
 | **Coût** | Gratuit | ~$18/mois + data |
 | **Production** | ⚠️ Non recommandé | ✅ Recommandé |
+| **Statut** | ⚠️ **Deprecated - Retrait septembre 2025** | ✅ Actif |
 
-**⚠️ IMPORTANT DevOps** : Basic SKU sera déprécié en 2025. Toujours utiliser Standard SKU.
+**⚠️ IMPORTANT DevOps** : 
+- **Basic SKU sera retiré en septembre 2025**
+- ⚠️ **Ne plus utiliser pour nouvelles installations**
+- **Migrer vers Standard SKU** pour tous les déploiements existants
 
 **Composants Techniques Détaillés :**
 
@@ -591,6 +595,7 @@ az network lb rule update \
   --load-distribution SourceIPProtocol
 ```
 - **Comportement** : Client → toujours même backend pour ce protocole
+- **Nom Azure officiel** : `SourceIPProtocol` (utilisé dans l'examen AZ-104)
 - **Usage** : FTP, RDP, applications legacy
 
 **Pattern DevOps - Choix de Distribution**
@@ -1671,6 +1676,9 @@ az network nsg show --name myNSG --resource-group myRG \
 
 # 4. Vérifier depuis la VM que le service écoute
 ssh user@vm1
+# Linux moderne (recommandé)
+ss -tuln | grep :80
+# Ou legacy
 netstat -tlnp | grep :80
 
 # 5. Vérifier logs applicatifs
@@ -2394,6 +2402,8 @@ az monitor metrics alert create \
 
 **1. Commandes de Diagnostic Spécialisées**
 - **`netstat -an`** : Diagnostic des ports d'écoute (essentiel pour troubleshooting)
+  - **Linux/moderne** : `ss -tuln` (recommandé, plus rapide et moderne)
+  - **Legacy** : `netstat -an` (compatible mais plus lent)
 - **`Test-NetConnection`** : Tests de connectivité modernes (remplace ping)
 - **`nbtstat -c`** : Diagnostic NetBIOS (legacy, moins fréquent)
 - **`Get-AzVirtualNetworkUsageList`** : PowerShell Azure (pas de diagnostic réseau)
@@ -2451,7 +2461,9 @@ az monitor metrics alert create \
 #### ExpressRoute
 - **Private connectivity** : Connexion privée dédiée
 - **No Internet** : Pas de transit par Internet
-- **Higher bandwidth** : Jusqu'à 100 Gbps
+- **Higher bandwidth** : Dépend du type
+  - **ExpressRoute Direct** : 10 Gbps ou 100 Gbps
+  - **ExpressRoute via provider** : 50 Mbps à 10 Gbps
 - **Lower latency** : Latence prévisible
 
 ### 4.6 Azure Bastion
@@ -2473,6 +2485,8 @@ az monitor metrics alert create \
 - **Accès** : Via navigateur et portail Azure
 - **Configuration** : Service géré, simple à déployer
 - **Coût** : Service facturé par heure
+  - **Basic SKU** : ~$140/mois (730 heures × $0.19/heure)
+  - **Standard SKU** : ~$140/mois + data transfer ($0.01/GB)
 - **Usage** : Production, environnements sécurisés
 
 **Remote Desktop (RDP Direct)**
