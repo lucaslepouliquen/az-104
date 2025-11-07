@@ -96,11 +96,13 @@ az vm create \
 
 **Comparaison des Solutions :**
 
-| Solution | Complexité | Coût | Temps | Effort Admin |
+| Solution | Complexité | Coût* | Temps | Effort Admin |
 |----------|------------|------|-------|--------------|
 | **IP Publique** | ✅ Très faible | ~$3/mois | 2 min | ✅ Minimal |
 | **Azure Bastion** | Moyenne | ~$150/mois | 15 min | Moyen |
 | **VPN Site-to-Site** | ❌ Élevée | ~$25-150/mois | 1-2h | ❌ Élevé |
+
+**\*Coûts indicatifs** : Prix approximatifs pour la région US East. Les tarifs varient selon les régions et changent fréquemment.
 
 **Solution Recommandée - Ajouter une IP Publique :**
 
@@ -189,12 +191,13 @@ Datacenter Azure
 
 **2. Update Domains (UD) - Domaines de Mise à Jour**
 - **Définition** : Groupe logique de VMs redémarrées ensemble lors de maintenances
-- **Par défaut** : 5 Update Domains (si non spécifié à la création)
-- **Configurable** : De 1 à 20 Update Domains maximum
-- **Important** : Configuration définie à la création, non modifiable après
+- **Par défaut** : **5 Update Domains** (si non spécifié à la création)
+- **Configurable** : De 1 à **20 Update Domains maximum**
+- **Important** : Configuration définie à la création, **non modifiable après**
 - **Protection** : Maintenance planifiée Azure (host OS updates, hardware maintenance)
 - **Processus** : Azure redémarre un seul UD à la fois
-- **Délai** : 30 minutes entre chaque UD redémarré
+- **Délai** : 30 minutes minimum entre chaque UD redémarré
+- **⚠️ Note** : La valeur par défaut de 5 est suffisante pour la plupart des scénarios
 
 **Visualisation des Update Domains :**
 ```
@@ -243,7 +246,7 @@ UD 2            VM7             VM8             VM9
 
 **Limitations importantes :**
 - **Zone géographique** : Limité à un seul datacenter
-- **Maximum VMs** : Limite pratique (recommandé : < 200 VMs)
+- **Maximum VMs** : Limite technique de **200 VMs par availability set**
 - **Famille de VM** : Toutes les VMs doivent être de tailles compatibles
 - **Managed Disks** : Fortement recommandé (Aligned ou non)
 - **Incompatibilité** : Ne peut PAS combiner avec Availability Zones
@@ -354,7 +357,7 @@ az vm create \
 
 **Comparaison Complète des Tiers :**
 
-| Tier | SKUs | Max Instances | Autoscale | Deployment Slots | Custom Domain | SSL | Prix/mois |
+| Tier | SKUs | Max Instances | Autoscale | Deployment Slots | Custom Domain | SSL | Prix/mois* |
 |------|------|---------------|-----------|------------------|---------------|-----|-----------|
 | **Free** | F1 | 1 (partagé) | ❌ Non | ❌ Non | ❌ Non | ❌ Non | Gratuit |
 | **Shared** | D1 | 1 (partagé) | ❌ Non | ❌ Non | ✅ Oui | ❌ Non | ~$10 |
@@ -363,6 +366,8 @@ az vm create \
 | **Premium** | P1v2-P3v2 | 30 | ✅ Oui | ✅ 20 slots | ✅ Oui | ✅ Oui | ~$150-600 |
 | **PremiumV3** | P1v3-P3v3 | 30 | ✅ Oui | ✅ 20 slots | ✅ Oui | ✅ Oui | ~$200-800 |
 | **Isolated** | I1-I3 | 100 | ✅ Oui | ✅ 20 slots | ✅ Oui | ✅ Oui | ~$650+ |
+
+**\*Prix indicatifs** : Prix approximatifs pour la région US East. Les tarifs varient selon les régions Azure et changent fréquemment. Consultez la [page officielle de tarification Azure App Service](https://azure.microsoft.com/pricing/details/app-service/) pour les prix actuels de votre région.
 
 **Caractéristiques par Tier :**
 
@@ -585,10 +590,45 @@ Get-AzAppServicePlan `
 - **Configuration preservation** : Settings spécifiques aux slots
 
 #### Authentication et Authorization
-** Configuration identifiée :** Désactiver l'accès anonyme
-- Configurer **Authentication** dans App Service
-- Ajouter identity providers : Microsoft, Google, Facebook, Twitter
-- **Anonymous access** est une méthode d'authentification
+
+**⚠️ Erreur Courante QCM : Comprendre Anonymous Access**
+
+**Anonymous Access n'est PAS une méthode d'authentification** - c'est l'**ABSENCE** d'authentification.
+
+**Méthodes d'Authentification Disponibles :**
+- ✅ **Microsoft Entra ID (Azure AD)** : Authentification Azure AD
+- ✅ **Microsoft Account** : Comptes personnels Microsoft
+- ✅ **Facebook** : Authentification via Facebook
+- ✅ **Google** : Authentification via Google
+- ✅ **Twitter** : Authentification via Twitter
+- ❌ **Anonymous Access** : Pas d'authentification (accès public par défaut)
+
+**Configuration - Désactiver l'Accès Anonyme :**
+
+Par défaut, App Service permet l'accès anonyme (sans authentification). Pour sécuriser votre application :
+
+```bash
+# Configurer l'authentification avec Azure AD
+az webapp auth update \
+  --resource-group myRG \
+  --name myWebApp \
+  --enabled true \
+  --action LoginWithAzureActiveDirectory \
+  --aad-client-id {client-id}
+```
+
+**Via Azure Portal :**
+```
+App Service → Authentication/Authorization
+→ App Service Authentication: On
+→ Action when request is not authenticated: Log in with Azure Active Directory
+→ Authentication Providers: Configure providers
+```
+
+**Actions Disponibles :**
+- **Allow Anonymous requests (no action)** : Accès public autorisé
+- **Log in with [Provider]** : Redirection vers authentification
+- **Return 401 Unauthorized** : Rejeter les requêtes non authentifiées
 
 ### 3.4 Azure Container Instances (ACI)
 
@@ -1575,13 +1615,33 @@ terraform import azurerm_resource_group.main /subscriptions/{sub-id}/resourceGro
 
 Le state file (`terraform.tfstate`) contient l'état actuel de l'infrastructure.
 
-**Local State (default) :**
+**🚨 AVERTISSEMENT DE SÉCURITÉ CRITIQUE 🚨**
+
+Le fichier `terraform.tfstate` contient des **informations sensibles en clair** :
+- ❌ **Mots de passe** : Admin passwords, database credentials
+- ❌ **Clés d'accès** : Storage account keys, API keys
+- ❌ **Secrets** : Certificats, tokens, connection strings
+- ❌ **Données privées** : Private IPs, configuration détaillée
+
+**⚠️ INTERDICTIONS ABSOLUES :**
+- ❌ **NE JAMAIS** commiter `terraform.tfstate` dans Git
+- ❌ **NE JAMAIS** partager le state file sans chiffrement
+- ❌ **NE JAMAIS** stocker le state file en local en production
+- ❌ **NE JAMAIS** exposer le state file publiquement
+
+**Local State (⚠️ Development SEULEMENT) :**
 ```hcl
 # State stocké localement (terraform.tfstate)
-# ⚠️ Ne pas commiter dans Git !
+# ⚠️ ATTENTION : Contient des secrets en clair !
+# ❌ Ne JAMAIS commiter dans Git !
+# ✅ Ajouter à .gitignore :
+#    terraform.tfstate
+#    terraform.tfstate.backup
+#    *.tfstate
+#    *.tfstate.*
 ```
 
-**Remote State (recommandé) :**
+**Remote State (✅ RECOMMANDÉ pour Production) :**
 ```hcl
 terraform {
   backend "azurerm" {
@@ -1589,9 +1649,29 @@ terraform {
     storage_account_name = "tfstatestorage"
     container_name       = "tfstate"
     key                  = "terraform.tfstate"
+    # ✅ Utiliser avec Azure Storage chiffré
+    # ✅ Activer State Locking
+    # ✅ Configurer RBAC pour accès restreint
   }
 }
 ```
+
+**Best Practices - Sécurité State File :**
+
+✅ **À FAIRE :**
+- Utiliser **Remote State** avec Azure Storage
+- Activer **State Locking** pour éviter les conflits
+- Chiffrer le backend storage (**SSE activé**)
+- Configurer **RBAC** pour accès restreint au state
+- Utiliser **Azure Key Vault** pour les secrets
+- Activer **Versioning** sur le storage account
+- Sauvegarder régulièrement le state
+
+❌ **À ÉVITER :**
+- Commiter le state file dans Git
+- Partager le state file par email/chat
+- Laisser le state file en local
+- Utiliser des secrets en dur dans les variables
 
 **Terraform Modules :**
 ```hcl
