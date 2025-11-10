@@ -12,6 +12,9 @@
   - [Types de Blobs](#types-de-blobs)
   - [Blob Access Tiers](#blob-access-tiers---optimisation-des-coûts)
   - [Lifecycle Management](#lifecycle-management---automatisation-des-transitions)
+  - [Soft Delete](#soft-delete)
+  - [Object Replication](#object-replication)
+  - [Static Website Hosting](#static-website-hosting)
 - [2.3 Azure Files](#23-azure-files-mise-à-jour-2024)
   - [Protocoles Supportés](#protocoles-supportés)
   - [Types de File Shares](#types-de-file-shares-mise-à-jour-2024)
@@ -819,6 +822,1077 @@ $policy = Set-AzStorageAccountManagementPolicy `
 - Suppression avant durée minimum (pénalités)
 - Lifecycle sans préfixes (règles trop larges)
 - Oublier coûts d'accès (peut dépasser économies de stockage)
+
+### Soft Delete
+
+**⚠️ Concept Clé pour AZ-104 : Soft Delete protège vos données contre les suppressions accidentelles en conservant les objets supprimés pendant une période de rétention configurable**
+
+**Définition :**
+- **Soft Delete** : Fonctionnalité de protection qui conserve les données supprimées pendant une période définie (7-365 jours)
+- **Objectif** : Récupération de données supprimées accidentellement ou malicieusement
+- **Scope** : Disponible pour Blobs, Containers, et File Shares
+
+**Types de Soft Delete :**
+
+**1. Soft Delete pour Blobs**
+
+**Caractéristiques :**
+- **Période de rétention** : 7 à 365 jours (configurable)
+- **Protection** : Blobs supprimés et versions écrasées
+- **Coût** : Stockage des blobs soft-deleted facturé au même tier
+- **Compatibilité** : Fonctionne avec blob versioning
+
+**Activation - Blob Soft Delete :**
+
+```bash
+# Via Azure CLI
+az storage account blob-service-properties update \
+  --account-name mystorageaccount \
+  --resource-group myResourceGroup \
+  --enable-delete-retention true \
+  --delete-retention-days 30
+
+# Vérifier la configuration
+az storage account blob-service-properties show \
+  --account-name mystorageaccount \
+  --resource-group myResourceGroup \
+  --query deleteRetentionPolicy
+```
+
+**Via PowerShell :**
+
+```powershell
+# Activer soft delete pour blobs
+Enable-AzStorageBlobDeleteRetentionPolicy `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageAccountName "mystorageaccount" `
+  -RetentionDays 30
+
+# Vérifier
+Get-AzStorageBlobServiceProperty `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageAccountName "mystorageaccount"
+```
+
+**Récupération de Blobs Soft-Deleted :**
+
+```bash
+# Via Azure CLI - Lister les blobs supprimés
+az storage blob list \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --include d \
+  --output table
+
+# Restaurer un blob supprimé (undelete)
+az storage blob undelete \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name myblob.txt
+```
+
+**Via PowerShell :**
+
+```powershell
+# Obtenir le contexte
+$ctx = New-AzStorageContext -StorageAccountName "mystorageaccount" -StorageAccountKey "xxxx"
+
+# Lister blobs supprimés
+Get-AzStorageBlob -Container "mycontainer" -Context $ctx -IncludeDeleted
+
+# Restaurer un blob
+$blob = Get-AzStorageBlob -Container "mycontainer" -Blob "myblob.txt" -Context $ctx -IncludeDeleted
+$blob.ICloudBlob.Undelete()
+```
+
+**Via Azure Portal :**
+```
+Storage Account → Containers → Select Container → Show deleted blobs → Select blob → Undelete
+```
+
+**2. Soft Delete pour Containers**
+
+**Caractéristiques :**
+- **Période de rétention** : 1 à 365 jours
+- **Protection** : Containers entiers supprimés
+- **Contenu** : Tous les blobs du container sont restaurés
+- **Nouveauté 2024** : Disponible en GA (Generally Available)
+
+**Activation - Container Soft Delete :**
+
+```bash
+# Via Azure CLI
+az storage account blob-service-properties update \
+  --account-name mystorageaccount \
+  --resource-group myResourceGroup \
+  --enable-container-delete-retention true \
+  --container-delete-retention-days 30
+
+# Lister containers supprimés
+az storage container list \
+  --account-name mystorageaccount \
+  --include-deleted \
+  --output table
+```
+
+**Via PowerShell :**
+
+```powershell
+# Activer soft delete pour containers
+Enable-AzStorageContainerDeleteRetentionPolicy `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageAccountName "mystorageaccount" `
+  -RetentionDays 30
+
+# Lister containers supprimés
+Get-AzStorageContainer -Context $ctx -IncludeDeleted
+
+# Restaurer un container
+Restore-AzStorageContainer `
+  -Name "mycontainer" `
+  -Context $ctx
+```
+
+**3. Soft Delete pour File Shares**
+
+**Caractéristiques :**
+- **Période de rétention** : 1 à 365 jours
+- **Protection** : File shares entiers supprimés
+- **Limitation** : Fonctionne uniquement avec Standard File Shares (pas Premium)
+- **Quota** : Le quota du share supprimé compte dans la limite du compte
+
+**Activation - File Share Soft Delete :**
+
+```bash
+# Via Azure CLI
+az storage account file-service-properties update \
+  --account-name mystorageaccount \
+  --resource-group myResourceGroup \
+  --enable-delete-retention true \
+  --delete-retention-days 14
+
+# Lister file shares supprimés
+az storage share list \
+  --account-name mystorageaccount \
+  --include-deleted \
+  --output table
+```
+
+**Via PowerShell :**
+
+```powershell
+# Activer soft delete pour file shares
+Update-AzStorageFileServiceProperty `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageAccountName "mystorageaccount" `
+  -EnableShareDeleteRetentionPolicy $true `
+  -ShareRetentionDays 14
+
+# Restaurer un file share
+Restore-AzStorageShare `
+  -Name "myfileshare" `
+  -Context $ctx
+```
+
+**⚠️ Comparaison des Soft Delete :**
+
+| Type | Période Min/Max | Coût | Restauration | Limitation |
+|------|----------------|------|--------------|------------|
+| **Blob Soft Delete** | 7-365 jours | ✅ Tier d'origine | Undelete | Aucune |
+| **Container Soft Delete** | 1-365 jours | ✅ Tier d'origine | Restore | Nom unique requis |
+| **File Share Soft Delete** | 1-365 jours | ✅ Quota compte | Restore | Standard uniquement |
+
+**⚠️ Scénarios d'Utilisation - Pour l'Examen :**
+
+**Scénario 1 : Protection contre Ransomware**
+
+```
+Problème :
+- Ransomware supprime des blobs
+- Besoin de récupération rapide
+- Minimiser la perte de données
+
+Solution :
+1. Activer Blob Soft Delete (30 jours minimum)
+2. Activer Blob Versioning (historique complet)
+3. Activer Container Soft Delete (30 jours)
+4. En cas d'attaque : Restaurer depuis soft delete
+
+# Configuration complète
+az storage account blob-service-properties update \
+  --account-name mystorageaccount \
+  --enable-delete-retention true \
+  --delete-retention-days 30 \
+  --enable-versioning true \
+  --enable-container-delete-retention true \
+  --container-delete-retention-days 30
+
+Avantages :
+✅ Protection multi-niveaux
+✅ Récupération rapide (minutes)
+✅ Pas besoin de backup restore
+✅ Historique complet avec versioning
+```
+
+**Scénario 2 : Suppression Accidentelle par Utilisateur**
+
+```
+Problème :
+- Utilisateur supprime un container par erreur
+- 500 GB de données perdues
+- Besoin de restauration immédiate
+
+Solution :
+1. Vérifier que Container Soft Delete est activé
+2. Lister containers supprimés
+3. Restaurer le container
+
+# Commandes
+az storage container list --account-name mystorageaccount --include-deleted
+az storage container restore --name mycontainer --account-name mystorageaccount
+
+Temps de récupération : < 5 minutes
+```
+
+**⚠️ Best Practices Soft Delete :**
+
+**1. Période de Rétention**
+- ✅ **Minimum 30 jours** pour blobs et containers
+- ✅ **14 jours** pour file shares (suffisant pour la plupart des cas)
+- ✅ Aligner avec les politiques de backup
+
+**2. Coûts**
+- ⚠️ Soft-deleted blobs **comptent dans le stockage**
+- ✅ Monitorer l'espace utilisé par soft delete
+- ✅ Ajuster période de rétention selon budget
+
+```bash
+# Vérifier l'espace utilisé par soft delete
+az storage blob list \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --include d \
+  --query "[?properties.deletedTime!=null].{Name:name, Size:properties.contentLength}" \
+  --output table
+```
+
+**3. Combinaison avec Autres Protections**
+- ✅ **Soft Delete + Versioning** : Protection maximale
+- ✅ **Soft Delete + Immutable Storage** : Compliance
+- ✅ **Soft Delete + Backup** : Stratégie 3-2-1
+
+**⚠️ Erreurs Courantes QCM :**
+
+| Question | Réponse Incorrecte ❌ | Réponse Correcte ✅ |
+|----------|----------------------|---------------------|
+| **"Soft Delete protège contre quoi ?"** | "Corruption de données" | "Suppression accidentelle ou malicieuse" |
+| **"Soft Delete est gratuit ?"** | "Oui, pas de coût supplémentaire" | "Non, stockage facturé au tier d'origine" |
+| **"Période de rétention max pour blobs ?"** | "90 jours" | "365 jours (1 an)" |
+| **"File Share Soft Delete fonctionne sur Premium ?"** | "Oui, tous les tiers" | "Non, Standard uniquement" |
+| **"Peut-on restaurer après expiration rétention ?"** | "Oui, via support Azure" | "Non, données définitivement supprimées" |
+
+**⚠️ Points Clés pour l'Examen :**
+- ✅ **3 types de Soft Delete** : Blobs (7-365j), Containers (1-365j), File Shares (1-365j)
+- ✅ **Coût** : Stockage facturé pendant période de rétention
+- ✅ **Restauration** : Undelete (blobs) ou Restore (containers/shares)
+- ✅ **File Share Soft Delete** : Standard uniquement, pas Premium
+- ✅ **Combinaison** : Soft Delete + Versioning = Protection maximale
+- ✅ **Ransomware** : Soft Delete est une défense efficace
+- ✅ **Portal** : Peut restaurer via UI (Show deleted blobs/containers)
+
+### Object Replication
+
+**⚠️ Concept Clé pour AZ-104 : Object Replication copie automatiquement les blobs entre storage accounts pour réduire la latence et améliorer la disponibilité**
+
+**Définition :**
+- **Object Replication** : Réplication asynchrone de block blobs entre storage accounts
+- **Objectif** : Disaster Recovery, réduction de latence, conformité géographique
+- **Direction** : Unidirectionnelle (source → destination)
+
+**Architecture Object Replication :**
+
+```
+┌─────────────────────────────────────────────────────┐
+│         Source Storage Account (Region A)           │
+│  ┌──────────────────────────────────────────┐      │
+│  │     Source Container: "prod-data"         │      │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  │      │
+│  │  │ Blob 1  │  │ Blob 2  │  │ Blob 3  │  │      │
+│  │  └─────────┘  └─────────┘  └─────────┘  │      │
+│  └──────────────────┬───────────────────────┘      │
+└─────────────────────┼─────────────────────────────┘
+                      │ Replication Rule
+                      │ (Asynchronous)
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│      Destination Storage Account (Region B)         │
+│  ┌──────────────────────────────────────────┐      │
+│  │  Destination Container: "prod-data-dr"    │      │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  │      │
+│  │  │ Blob 1  │  │ Blob 2  │  │ Blob 3  │  │      │
+│  │  └─────────┘  └─────────┘  └─────────┘  │      │
+│  └──────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────┘
+```
+
+**Prérequis Object Replication :**
+
+**1. Prérequis Techniques :**
+- ✅ **Blob Versioning** activé sur source ET destination
+- ✅ **Change Feed** activé sur source
+- ✅ **Block Blobs** uniquement (pas Page ou Append blobs)
+- ✅ **GPv2 ou Premium Block Blob** accounts
+- ✅ **Même région ou régions différentes** (cross-region supporté)
+
+**2. Activation des Prérequis :**
+
+```bash
+# Sur le compte SOURCE
+az storage account blob-service-properties update \
+  --account-name sourcestorageaccount \
+  --resource-group myResourceGroup \
+  --enable-versioning true \
+  --enable-change-feed true
+
+# Sur le compte DESTINATION
+az storage account blob-service-properties update \
+  --account-name deststorageaccount \
+  --resource-group myResourceGroup \
+  --enable-versioning true
+```
+
+**Configuration Object Replication :**
+
+**Méthode 1 : Via Azure Portal (Recommandé)**
+
+```
+1. Storage Account Source → Object replication → Set up replication rules
+2. Sélectionner Destination storage account
+3. Créer règle de réplication :
+   - Source container : prod-data
+   - Destination container : prod-data-dr
+   - Filtres (optionnel) : Prefixes, tags
+4. Save
+```
+
+**Méthode 2 : Via Azure CLI**
+
+```bash
+# Étape 1 : Créer la policy sur destination (génère policy ID)
+az storage account or-policy create \
+  --account-name deststorageaccount \
+  --resource-group myResourceGroup \
+  --source-account sourcestorageaccount \
+  --destination-account deststorageaccount \
+  --source-container prod-data \
+  --destination-container prod-data-dr \
+  --policy-id "policy1"
+
+# Étape 2 : Appliquer la policy sur source
+az storage account or-policy show \
+  --account-name deststorageaccount \
+  --policy-id "policy1" \
+  --resource-group myResourceGroup
+
+# Copier la policy et l'appliquer sur source
+az storage account or-policy create \
+  --account-name sourcestorageaccount \
+  --resource-group myResourceGroup \
+  --policy @policy.json
+```
+
+**Via PowerShell :**
+
+```powershell
+# Obtenir les contextes
+$srcCtx = New-AzStorageContext -StorageAccountName "sourcestorageaccount" -UseConnectedAccount
+$destCtx = New-AzStorageContext -StorageAccountName "deststorageaccount" -UseConnectedAccount
+
+# Créer règle de réplication
+$rule = New-AzStorageObjectReplicationPolicyRule `
+  -SourceContainer "prod-data" `
+  -DestinationContainer "prod-data-dr" `
+  -PrefixMatch "important/"
+
+# Créer policy
+New-AzStorageObjectReplicationPolicy `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageAccountName "sourcestorageaccount" `
+  -PolicyId "policy1" `
+  -Rule $rule
+```
+
+**Règles de Réplication - Filtres :**
+
+**1. Prefix Match (Filtrer par chemin)**
+
+```json
+{
+  "rules": [
+    {
+      "ruleId": "rule1",
+      "sourceContainer": "prod-data",
+      "destinationContainer": "prod-data-dr",
+      "filters": {
+        "prefixMatch": [
+          "important/",
+          "critical/"
+        ]
+      }
+    }
+  ]
+}
+```
+
+**2. Minimum Creation Time (Filtrer par date)**
+
+```json
+{
+  "rules": [
+    {
+      "ruleId": "rule2",
+      "sourceContainer": "prod-data",
+      "destinationContainer": "prod-data-dr",
+      "filters": {
+        "minCreationTime": "2024-01-01T00:00:00Z"
+      }
+    }
+  ]
+}
+```
+
+**⚠️ Comportement de la Réplication :**
+
+**Ce qui est répliqué :**
+- ✅ **Nouveaux blobs** créés après configuration
+- ✅ **Modifications** de blobs existants (nouvelles versions)
+- ✅ **Métadonnées** et tags
+- ✅ **Blob tiers** (Hot, Cool, Archive)
+
+**Ce qui N'EST PAS répliqué :**
+- ❌ **Blobs existants** avant configuration (sauf si re-uploadés)
+- ❌ **Suppressions** (soft delete ou hard delete)
+- ❌ **Snapshots** (uniquement versions)
+- ❌ **Immutable blobs** (WORM)
+
+**Réplication de Blobs Existants :**
+
+```bash
+# Pour répliquer blobs existants, utiliser AzCopy
+azcopy copy \
+  "https://sourcestorageaccount.blob.core.windows.net/prod-data/*?<SAS>" \
+  "https://deststorageaccount.blob.core.windows.net/prod-data-dr/?<SAS>" \
+  --recursive
+
+# Puis activer object replication pour changements futurs
+```
+
+**⚠️ Use Cases Object Replication :**
+
+**Use Case 1 : Disaster Recovery (DR)**
+
+```
+Problème :
+- Région primaire (West Europe) indisponible
+- Besoin de failover vers région secondaire (North Europe)
+- RTO < 1 heure
+
+Solution :
+1. Object Replication : West Europe → North Europe
+2. En cas de panne :
+   - Pointer applications vers North Europe storage
+   - Données récentes disponibles (latence réplication ~minutes)
+3. Après restauration : Inverser réplication si nécessaire
+
+Configuration :
+Source : westeuropeaccount/prod-data
+Destination : northeuropeaccount/prod-data-dr
+Filters : Tous les blobs
+```
+
+**Use Case 2 : Réduction de Latence Géographique**
+
+```
+Problème :
+- Utilisateurs en Asie accèdent à storage en Europe
+- Latence élevée (200-300ms)
+- Besoin de performance locale
+
+Solution :
+1. Object Replication : Europe → Asie
+2. Applications en Asie lisent depuis storage local
+3. Écritures toujours vers Europe (source)
+4. Réplication automatique vers Asie
+
+Configuration :
+Source : europestorageaccount/media
+Destination : asiastorageaccount/media-replica
+Filters : prefixMatch: ["images/", "videos/"]
+
+Résultat : Latence réduite de 250ms → 20ms
+```
+
+**Use Case 3 : Conformité Multi-Région**
+
+```
+Problème :
+- Réglementation exige données en Europe ET US
+- Données doivent être identiques
+- Audit trail requis
+
+Solution :
+1. Object Replication bidirectionnelle (2 policies)
+   - Policy 1 : Europe → US
+   - Policy 2 : US → Europe
+2. Versioning activé (audit trail)
+3. Monitoring de replication status
+
+⚠️ Attention : Bidirectionnel peut causer conflits
+Recommandation : Unidirectionnel avec source unique
+```
+
+**Monitoring Object Replication :**
+
+**Vérifier le Statut de Réplication :**
+
+```bash
+# Via Azure CLI - Vérifier policy
+az storage account or-policy show \
+  --account-name sourcestorageaccount \
+  --policy-id "policy1" \
+  --resource-group myResourceGroup
+
+# Vérifier statut d'un blob spécifique
+az storage blob show \
+  --account-name sourcestorageaccount \
+  --container-name prod-data \
+  --name myblob.txt \
+  --query "objectReplicationSourceProperties"
+```
+
+**Via PowerShell :**
+
+```powershell
+# Obtenir statut de réplication d'un blob
+$blob = Get-AzStorageBlob -Container "prod-data" -Blob "myblob.txt" -Context $srcCtx
+$blob.BlobProperties.ObjectReplicationSourceProperties
+
+# Statuts possibles :
+# - Completed : Réplication réussie
+# - Failed : Échec de réplication
+# - InProgress : En cours
+```
+
+**Métriques Azure Monitor :**
+
+```
+Storage Account → Monitoring → Metrics
+
+Métriques clés :
+- Object Replication Latency : Temps de réplication
+- Object Replication Bytes : Volume répliqué
+- Object Replication Count : Nombre d'objets répliqués
+```
+
+**⚠️ Limites Object Replication :**
+
+| Limite | Valeur | Notes |
+|--------|--------|-------|
+| **Policies par storage account** | 1000 | Source + Destination |
+| **Rules par policy** | 1000 | Filtres multiples possibles |
+| **Source containers par rule** | 1 | Un container source par règle |
+| **Destination containers par rule** | 1 | Un container destination par règle |
+| **Latence de réplication** | Minutes à heures | Dépend de la taille et région |
+
+**⚠️ Coûts Object Replication :**
+
+```
+Composants de Coût :
+1. Stockage destination (même prix que source)
+2. Transactions de réplication (PUT operations)
+3. Egress data (sortie de région source)
+4. Change Feed (inclus, pas de coût supplémentaire)
+5. Versioning (stockage des versions)
+
+Optimisation :
+- Utiliser filtres (prefixMatch) pour limiter scope
+- Choisir régions avec coûts egress faibles
+- Monitorer volume répliqué
+```
+
+**⚠️ Erreurs Courantes QCM :**
+
+| Question | Réponse Incorrecte ❌ | Réponse Correcte ✅ |
+|----------|----------------------|---------------------|
+| **"Object Replication est synchrone ?"** | "Oui, temps réel" | "Non, asynchrone (minutes)" |
+| **"Peut répliquer blobs existants automatiquement ?"** | "Oui, tous les blobs" | "Non, uniquement nouveaux blobs après config" |
+| **"Réplication bidirectionnelle automatique ?"** | "Oui, en activant option" | "Non, nécessite 2 policies séparées" |
+| **"Suppression répliquée ?"** | "Oui, automatiquement" | "Non, suppressions ne sont pas répliquées" |
+| **"Prérequis pour Object Replication ?"** | "Aucun" | "Versioning + Change Feed sur source" |
+
+**⚠️ Points Clés pour l'Examen :**
+- ✅ **Réplication asynchrone** : Latence de minutes (pas temps réel)
+- ✅ **Prérequis** : Versioning (source + dest) + Change Feed (source)
+- ✅ **Unidirectionnel** : Source → Destination (bidirectionnel = 2 policies)
+- ✅ **Block Blobs uniquement** : Pas Page ou Append blobs
+- ✅ **Nouveaux blobs** : Réplication automatique après configuration
+- ✅ **Blobs existants** : Utiliser AzCopy pour migration initiale
+- ✅ **Suppressions non répliquées** : Comportement par design
+- ✅ **Use Cases** : DR, réduction latence, conformité multi-région
+- ✅ **Filtres** : prefixMatch, minCreationTime pour scope limité
+
+### Static Website Hosting
+
+**⚠️ Concept Clé pour AZ-104 : Static Website Hosting permet d'héberger des sites web statiques (HTML, CSS, JS) directement depuis Azure Blob Storage à faible coût**
+
+**Définition :**
+- **Static Website Hosting** : Fonctionnalité qui sert des fichiers statiques via HTTP/HTTPS
+- **Objectif** : Hébergement simple et économique de sites statiques, SPAs (Single Page Applications)
+- **Container spécial** : `$web` créé automatiquement
+
+**Architecture Static Website :**
+
+```
+┌─────────────────────────────────────────────────────┐
+│         Storage Account (GPv2 ou BlockBlobStorage)   │
+│  ┌──────────────────────────────────────────┐      │
+│  │     Container: $web (automatique)         │      │
+│  │  ┌─────────────┐  ┌──────────────┐      │      │
+│  │  │ index.html  │  │ error.html   │      │      │
+│  │  └─────────────┘  └──────────────┘      │      │
+│  │  ┌─────────────┐  ┌──────────────┐      │      │
+│  │  │ styles.css  │  │ script.js    │      │      │
+│  │  └─────────────┘  └──────────────┘      │      │
+│  │  ┌─────────────────────────────┐        │      │
+│  │  │ images/                      │        │      │
+│  │  │   ├── logo.png               │        │      │
+│  │  │   └── banner.jpg             │        │      │
+│  │  └─────────────────────────────┘        │      │
+│  └──────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────┘
+                      ▼
+         Public Endpoint (HTTPS)
+https://mystorageaccount.z6.web.core.windows.net
+                      ▼
+              Custom Domain (optionnel)
+           https://www.example.com
+```
+
+**Activation Static Website Hosting :**
+
+**Via Azure CLI :**
+
+```bash
+# Activer static website hosting
+az storage blob service-properties update \
+  --account-name mystorageaccount \
+  --static-website \
+  --404-document error.html \
+  --index-document index.html
+
+# Vérifier la configuration
+az storage blob service-properties show \
+  --account-name mystorageaccount \
+  --query "staticWebsite"
+
+# Output : Primary endpoint
+# https://mystorageaccount.z6.web.core.windows.net
+```
+
+**Via PowerShell :**
+
+```powershell
+# Activer static website
+Enable-AzStorageStaticWebsite `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageAccountName "mystorageaccount" `
+  -IndexDocument "index.html" `
+  -ErrorDocument404Path "error.html"
+
+# Obtenir l'endpoint
+$account = Get-AzStorageAccount -ResourceGroupName "myResourceGroup" -Name "mystorageaccount"
+$account.PrimaryEndpoints.Web
+```
+
+**Via Azure Portal :**
+
+```
+Storage Account → Data management → Static website
+├── Enable : On
+├── Index document name : index.html
+├── Error document path : error.html
+└── Save
+
+Primary endpoint : https://mystorageaccount.z6.web.core.windows.net
+```
+
+**Container $web - Caractéristiques :**
+
+**Propriétés du Container $web :**
+- **Création automatique** : Créé lors de l'activation de static website
+- **Nom réservé** : `$web` (ne peut pas être renommé)
+- **Accès public** : Configuré automatiquement en lecture anonyme
+- **Structure** : Peut contenir dossiers et sous-dossiers
+- **Suppression** : Désactiver static website pour supprimer
+
+**Upload de Fichiers vers $web :**
+
+```bash
+# Via Azure CLI
+az storage blob upload-batch \
+  --account-name mystorageaccount \
+  --source ./website \
+  --destination '$web' \
+  --overwrite
+
+# Upload fichier individuel
+az storage blob upload \
+  --account-name mystorageaccount \
+  --container-name '$web' \
+  --name index.html \
+  --file ./index.html \
+  --content-type "text/html"
+```
+
+**Via AzCopy (Recommandé pour gros volumes) :**
+
+```bash
+# Upload récursif
+azcopy copy './website/*' \
+  'https://mystorageaccount.blob.core.windows.net/$web?<SAS>' \
+  --recursive
+
+# Sync (supprime fichiers non présents en local)
+azcopy sync './website' \
+  'https://mystorageaccount.blob.core.windows.net/$web?<SAS>' \
+  --recursive --delete-destination=true
+```
+
+**Documents Index et Error :**
+
+**1. Index Document (index.html)**
+- **Rôle** : Page par défaut servie à la racine et dans les dossiers
+- **Comportement** : 
+  - `https://mystorageaccount.z6.web.core.windows.net/` → Sert `index.html`
+  - `https://mystorageaccount.z6.web.core.windows.net/blog/` → Sert `blog/index.html`
+
+**Exemple index.html :**
+
+```html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Mon Site Static</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Bienvenue sur mon site Azure Static</h1>
+    <p>Hébergé sur Azure Blob Storage</p>
+    <script src="script.js"></script>
+</body>
+</html>
+```
+
+**2. Error Document (error.html)**
+- **Rôle** : Page servie pour erreurs 404 (Not Found)
+- **Comportement** : Toute URL non trouvée redirige vers error.html
+- **HTTP Status** : 404 (pas 200)
+
+**Exemple error.html :**
+
+```html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Page Non Trouvée - 404</title>
+</head>
+<body>
+    <h1>404 - Page Non Trouvée</h1>
+    <p>La page que vous recherchez n'existe pas.</p>
+    <a href="/">Retour à l'accueil</a>
+</body>
+</html>
+```
+
+**Custom Domains avec Azure CDN :**
+
+**Pourquoi utiliser un Custom Domain ?**
+- ✅ **Branding** : www.example.com au lieu de mystorageaccount.z6.web.core.windows.net
+- ✅ **HTTPS personnalisé** : Certificat SSL pour domaine custom
+- ✅ **Performance** : CDN cache le contenu globalement
+- ✅ **Compression** : Gzip automatique via CDN
+
+**Configuration Custom Domain avec Azure CDN :**
+
+**Étape 1 : Créer Azure CDN Profile et Endpoint**
+
+```bash
+# Créer CDN Profile
+az cdn profile create \
+  --resource-group myResourceGroup \
+  --name myCDNProfile \
+  --sku Standard_Microsoft
+
+# Créer CDN Endpoint
+az cdn endpoint create \
+  --resource-group myResourceGroup \
+  --profile-name myCDNProfile \
+  --name mywebsite \
+  --origin mystorageaccount.z6.web.core.windows.net \
+  --origin-host-header mystorageaccount.z6.web.core.windows.net \
+  --enable-compression true \
+  --content-types-to-compress "text/html" "text/css" "application/javascript"
+
+# Output : Endpoint URL
+# https://mywebsite.azureedge.net
+```
+
+**Étape 2 : Configurer DNS pour Custom Domain**
+
+```
+Chez votre registrar DNS (GoDaddy, Cloudflare, etc.) :
+
+Type : CNAME
+Name : www
+Value : mywebsite.azureedge.net
+TTL : 3600
+```
+
+**Étape 3 : Ajouter Custom Domain au CDN Endpoint**
+
+```bash
+# Ajouter custom domain
+az cdn custom-domain create \
+  --resource-group myResourceGroup \
+  --profile-name myCDNProfile \
+  --endpoint-name mywebsite \
+  --name www-example-com \
+  --hostname www.example.com
+
+# Activer HTTPS (certificat gratuit via CDN)
+az cdn custom-domain enable-https \
+  --resource-group myResourceGroup \
+  --profile-name myCDNProfile \
+  --endpoint-name mywebsite \
+  --name www-example-com \
+  --min-tls-version "1.2"
+```
+
+**Étape 4 : Vérification**
+
+```bash
+# Tester l'accès
+curl -I https://www.example.com
+
+# Vérifier cache CDN
+curl -I https://www.example.com | grep "X-Cache"
+# X-Cache: HIT (contenu servi depuis CDN)
+# X-Cache: MISS (contenu récupéré depuis origin)
+```
+
+**⚠️ Configuration CDN Avancée :**
+
+**1. Compression**
+
+```bash
+# Activer compression Gzip
+az cdn endpoint update \
+  --resource-group myResourceGroup \
+  --profile-name myCDNProfile \
+  --name mywebsite \
+  --enable-compression true \
+  --content-types-to-compress \
+    "text/html" \
+    "text/css" \
+    "text/javascript" \
+    "application/javascript" \
+    "application/json" \
+    "image/svg+xml"
+```
+
+**2. Caching Rules**
+
+```bash
+# Configurer cache duration
+az cdn endpoint rule add \
+  --resource-group myResourceGroup \
+  --profile-name myCDNProfile \
+  --endpoint-name mywebsite \
+  --order 1 \
+  --rule-name "CacheStaticAssets" \
+  --match-variable UrlFileExtension \
+  --operator Equal \
+  --match-values "jpg" "png" "css" "js" \
+  --action-name CacheExpiration \
+  --cache-behavior Override \
+  --cache-duration "7.00:00:00"
+```
+
+**3. Purge CDN Cache**
+
+```bash
+# Purger tout le cache
+az cdn endpoint purge \
+  --resource-group myResourceGroup \
+  --profile-name myCDNProfile \
+  --name mywebsite \
+  --content-paths "/*"
+
+# Purger fichiers spécifiques
+az cdn endpoint purge \
+  --resource-group myResourceGroup \
+  --profile-name myCDNProfile \
+  --name mywebsite \
+  --content-paths "/index.html" "/styles.css"
+```
+
+**⚠️ Use Cases Static Website Hosting :**
+
+**Use Case 1 : Portfolio / Site Vitrine**
+
+```
+Caractéristiques :
+- HTML/CSS/JS statique
+- Pas de backend
+- Faible trafic (<10K visiteurs/mois)
+
+Solution :
+1. Static Website Hosting sur Storage Account
+2. Pas besoin de CDN (coût minimal)
+3. Custom domain via CNAME direct (sans HTTPS)
+
+Coût mensuel : ~$0.50 (stockage + transactions)
+```
+
+**Use Case 2 : Single Page Application (SPA) - React/Vue/Angular**
+
+```
+Caractéristiques :
+- Application React buildée (build/)
+- API backend séparée
+- Trafic global
+
+Solution :
+1. Build de l'app : npm run build
+2. Upload build/ vers $web
+3. Azure CDN avec custom domain
+4. HTTPS gratuit via CDN
+5. Compression Gzip activée
+
+# Déploiement automatisé
+npm run build
+azcopy sync './build' 'https://mystorageaccount.blob.core.windows.net/$web?<SAS>' --recursive
+az cdn endpoint purge --profile-name myCDNProfile --name mywebsite --content-paths "/*"
+
+Coût mensuel : ~$5-20 (selon trafic CDN)
+```
+
+**Use Case 3 : Documentation Technique**
+
+```
+Caractéristiques :
+- Site généré (MkDocs, Hugo, Jekyll)
+- Nombreuses pages
+- Recherche côté client
+
+Solution :
+1. Générer site statique : mkdocs build
+2. Upload vers $web
+3. CDN pour performance
+4. Versioning des déploiements
+
+Avantages :
+✅ Pas de serveur à maintenir
+✅ Scalabilité automatique
+✅ Coût très faible
+```
+
+**⚠️ Limites Static Website Hosting :**
+
+| Limitation | Impact | Workaround |
+|-----------|--------|------------|
+| **Pas de HTTPS natif** | Sécurité | Utiliser Azure CDN avec HTTPS |
+| **Pas de redirections** | SEO | Gérer côté client (JS) ou CDN rules |
+| **Pas de headers custom** | Cache control | Configurer via CDN |
+| **404 pour toutes erreurs** | UX | SPA avec client-side routing |
+| **Pas de server-side logic** | Fonctionnalités | Utiliser Azure Functions + API |
+
+**⚠️ Erreurs Courantes QCM :**
+
+| Question | Réponse Incorrecte ❌ | Réponse Correcte ✅ |
+|----------|----------------------|---------------------|
+| **"Static Website supporte PHP/Python ?"** | "Oui, via configuration" | "Non, fichiers statiques uniquement (HTML/CSS/JS)" |
+| **"HTTPS disponible par défaut ?"** | "Oui, automatique" | "Non, nécessite Azure CDN pour HTTPS custom" |
+| **"Container $web peut être renommé ?"** | "Oui, dans settings" | "Non, nom réservé et fixe" |
+| **"Peut héberger API backend ?"** | "Oui, avec Node.js" | "Non, utiliser Azure Functions ou App Service" |
+| **"Custom domain sans CDN possible ?"** | "Non, CDN obligatoire" | "Oui, mais sans HTTPS (HTTP uniquement)" |
+
+**⚠️ Best Practices Static Website :**
+
+**1. Performance**
+- ✅ Utiliser Azure CDN pour distribution globale
+- ✅ Activer compression Gzip
+- ✅ Optimiser images (WebP, compression)
+- ✅ Minifier CSS/JS
+
+**2. Sécurité**
+- ✅ HTTPS via CDN (certificat gratuit)
+- ✅ Content Security Policy headers (via CDN)
+- ✅ Pas de données sensibles dans fichiers statiques
+
+**3. Déploiement**
+- ✅ CI/CD avec GitHub Actions ou Azure DevOps
+- ✅ Purge CDN après déploiement
+- ✅ Versioning des releases
+
+**Exemple GitHub Actions Workflow :**
+
+```yaml
+name: Deploy Static Website
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Deploy to Azure Storage
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az storage blob upload-batch \
+              --account-name mystorageaccount \
+              --source ./build \
+              --destination '$web' \
+              --overwrite
+      
+      - name: Purge CDN
+        run: |
+          az cdn endpoint purge \
+            --profile-name myCDNProfile \
+            --name mywebsite \
+            --content-paths "/*"
+```
+
+**⚠️ Points Clés pour l'Examen :**
+- ✅ **Container $web** : Créé automatiquement, nom réservé
+- ✅ **index.html** : Document par défaut (racine et dossiers)
+- ✅ **error.html** : Page 404 personnalisée
+- ✅ **Fichiers statiques uniquement** : HTML, CSS, JS, images
+- ✅ **Pas de HTTPS natif** : Utiliser Azure CDN pour custom domain HTTPS
+- ✅ **Custom domain** : CNAME vers CDN endpoint
+- ✅ **Compression** : Activer Gzip via CDN
+- ✅ **Use Cases** : SPAs, portfolios, documentation, sites vitrines
+- ✅ **Coût** : Très faible (stockage + transactions + CDN optionnel)
+- ✅ **Déploiement** : AzCopy, Azure CLI, ou CI/CD pipelines
 
 ---
 
