@@ -19,6 +19,7 @@
   - [Protocoles Supportés](#protocoles-supportés)
   - [Types de File Shares](#types-de-file-shares-mise-à-jour-2024)
   - [Capacités et Limites](#capacités-et-limites-mise-à-jour-2024)
+  - [Méthodes d'Authentification](#méthodes-dauthentification-pour-azure-storage)
   - [Azure File Sync](#azure-file-sync)
 - [2.4 Azure Data Lake Storage Gen2](#24-azure-data-lake-storage-gen2)
   - [Hierarchical Namespace](#hierarchical-namespace---concept-clé)
@@ -1946,6 +1947,462 @@ jobs:
   - Modèle v2 approvisionné : Jusqu'à 256 TiB par share
 - **Azure Import/Export** : Support Blob Storage et Azure Files
 - **Nouveauté** : Support des identités managées pour Azure File Sync
+
+### Méthodes d'Authentification pour Azure Storage
+
+**⚠️ Concept Clé pour AZ-104 : Chaque service de stockage Azure supporte différentes méthodes d'authentification - Comprendre quelle méthode utiliser pour quel service est ESSENTIEL pour l'examen**
+
+**Vue d'Ensemble des Méthodes d'Authentification :**
+
+| Méthode d'Authentification | Type | Azure Files (SMB) | Blob Storage | Queue Storage | Table Storage |
+|----------------------------|------|-------------------|--------------|---------------|---------------|
+| **Kerberos (Microsoft Entra)** | **IAM** | ✅ **OUI** | ❌ Non | ❌ Non | ❌ Non |
+| **Azure AD (OAuth 2.0)** | **IAM** | ⚠️ Via REST API | ✅ Oui | ✅ Oui | ✅ Oui |
+| **Shared Key (Account Key)** | **Credential** | ✅ Oui | ✅ Oui | ✅ Oui | ✅ Oui |
+| **Shared Access Signature (SAS)** | **Credential** | ✅ Oui | ✅ Oui | ✅ Oui | ✅ Oui |
+| **Anonymous Public Access** | **None** | ❌ Non | ✅ Oui | ❌ Non | ❌ Non |
+
+**⚠️ Point Critique pour l'Examen :**
+
+**Question Type Examen :** *"Which storage data service can be configured to use identity-based access?"*
+
+**Réponse : Azure Files (file shares)** ✅
+
+**Pourquoi ?** Azure Files est le SEUL service de stockage qui supporte **Microsoft Entra Kerberos** (anciennement Azure AD Kerberos), qui est une authentification basée sur l'identité (IAM).
+
+---
+
+### 1. Kerberos Authentication (Microsoft Entra) - IDENTITY-BASED (IAM)
+
+**⚠️ Azure Files UNIQUEMENT - Méthode d'Authentification Basée sur l'Identité**
+
+**Définition :**
+- **Microsoft Entra Kerberos** : Protocole d'authentification IAM qui permet aux utilisateurs Azure AD d'accéder aux file shares
+- **Type** : **Identity and Access Management (IAM)** - Authentification basée sur l'identité
+- **Scope** : **Azure Files (SMB) uniquement** - NE fonctionne PAS pour Blobs, Queues, ou Tables
+- **Avantage** : Pas besoin de clés de stockage, authentification SSO (Single Sign-On)
+
+**Cas d'Usage :**
+- Utilisateurs Azure AD accédant à des file shares
+- Migration lift-and-shift depuis AD on-premises
+- Scénarios hybrides avec Azure AD Connect
+
+**Configuration Microsoft Entra Kerberos :**
+
+**Prérequis :**
+- Azure Files (Standard ou Premium)
+- Azure AD tenant
+- Utilisateurs/groupes Azure AD
+- Optionnel : Azure AD Connect pour synchronisation hybrid
+
+**Étape 1 : Activer l'Authentification Identity-Based**
+
+```bash
+# Via Azure CLI
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myResourceGroup \
+  --enable-files-aadds false \
+  --enable-files-aadkerb true
+
+# Paramètres :
+# --enable-files-aadds : Azure AD Domain Services (legacy)
+# --enable-files-aadkerb : Microsoft Entra Kerberos (recommandé 2024)
+```
+
+**Via PowerShell :**
+
+```powershell
+# Activer Microsoft Entra Kerberos
+Set-AzStorageAccount `
+  -ResourceGroupName "myResourceGroup" `
+  -Name "mystorageaccount" `
+  -EnableAzureActiveDirectoryKerberosForFile $true
+```
+
+**Étape 2 : Configurer les Permissions RBAC sur le File Share**
+
+```bash
+# Obtenir l'ID du file share
+$fileShareResourceId = (Get-AzStorageShare `
+  -Context (New-AzStorageContext -StorageAccountName "mystorageaccount" -UseConnectedAccount) `
+  -Name "myfileshare").Id
+
+# Assigner le rôle "Storage File Data SMB Share Contributor"
+az role assignment create \
+  --assignee user@contoso.com \
+  --role "Storage File Data SMB Share Contributor" \
+  --scope "/subscriptions/xxx/resourceGroups/myRG/providers/Microsoft.Storage/storageAccounts/mystorageaccount/fileServices/default/fileshares/myfileshare"
+```
+
+**Rôles RBAC pour Azure Files (SMB) :**
+
+| Rôle | Permissions | Use Case |
+|------|------------|----------|
+| **Storage File Data SMB Share Reader** | Lecture seule | Consultation, audits |
+| **Storage File Data SMB Share Contributor** | Lecture, écriture, modification | Utilisateurs standard |
+| **Storage File Data SMB Share Elevated Contributor** | Lecture, écriture, modification, changement ACLs | Administrateurs de données |
+
+**Étape 3 : Configurer les ACLs Windows (NTFS Permissions)**
+
+```powershell
+# Monter le file share avec identité Azure AD
+$connectTestResult = Test-NetConnection -ComputerName mystorageaccount.file.core.windows.net -Port 445
+if ($connectTestResult.TcpTestSucceeded) {
+    # Mapper le lecteur réseau
+    New-PSDrive -Name Z -PSProvider FileSystem `
+      -Root "\\mystorageaccount.file.core.windows.net\myfileshare" `
+      -Persist
+    
+    # Configurer NTFS permissions (comme Windows traditionnel)
+    icacls Z:\ /grant "user@contoso.com:(OI)(CI)M"
+}
+```
+
+**Étape 4 : Accès depuis les Clients**
+
+```powershell
+# Windows 10/11 - Connexion avec identité Azure AD
+net use Z: \\mystorageaccount.file.core.windows.net\myfileshare /user:Azure\user@contoso.com
+
+# Ou avec cmdkey (SSO)
+cmdkey /add:mystorageaccount.file.core.windows.net /user:Azure\user@contoso.com /pass:<password>
+net use Z: \\mystorageaccount.file.core.windows.net\myfileshare
+```
+
+**⚠️ Types d'Identity-Based Access pour Azure Files :**
+
+**1. Microsoft Entra Kerberos (Recommandé 2024)**
+- **Scenario** : Cloud-only ou hybrid identity
+- **Prérequis** : Azure AD tenant
+- **Avantage** : Pas besoin de Azure AD Domain Services (AADDS)
+- **Limitation** : SMB uniquement
+
+**2. Azure AD Domain Services (AADDS) - Legacy**
+- **Scenario** : Environnements entièrement cloud
+- **Prérequis** : AADDS déployé (coût supplémentaire ~$100/mois)
+- **Avantage** : Émulation complète d'AD Domain Controller
+- **Limitation** : Complexité et coût
+
+**3. On-Premises AD DS avec Azure AD Connect**
+- **Scenario** : Environnements hybrides
+- **Prérequis** : AD on-premises + Azure AD Connect + connectivité
+- **Avantage** : Intégration complète avec AD existant
+- **Limitation** : Infrastructure on-premises requise
+
+**Comparaison des Méthodes Identity-Based :**
+
+| Critère | Microsoft Entra Kerberos | Azure AD DS | On-Premises AD DS |
+|---------|-------------------------|-------------|-------------------|
+| **Coût** | ✅ Gratuit | ❌ ~$100/mois | ⚠️ Infrastructure existante |
+| **Complexité** | ✅ Simple | ⚠️ Moyenne | ❌ Complexe |
+| **Cloud-Only** | ✅ Oui | ✅ Oui | ❌ Non (hybrid) |
+| **Prérequis** | Azure AD | AADDS déployé | AD + Azure AD Connect |
+| **Recommandation 2024** | ✅ Préféré | ⚠️ Legacy | ⚠️ Si hybrid requis |
+
+**⚠️ Scénario d'Examen - Identity-Based Access :**
+
+```
+Question : Which storage data service can be configured to use identity-based access?
+A) containers (Blob Storage)
+B) file shares (Azure Files)  ✅ CORRECT
+C) queues
+D) tables
+
+Explication :
+- Azure Files supporte Microsoft Entra Kerberos (IAM)
+- Les utilisateurs s'authentifient avec leurs identités Azure AD
+- RBAC + NTFS permissions pour contrôle d'accès granulaire
+- Blob, Queue, Table utilisent Azure AD OAuth mais PAS Kerberos
+```
+
+---
+
+### 2. Authentification Azure AD (OAuth 2.0) - IAM pour Blobs, Queues, Tables
+
+**Définition :**
+- **Azure AD OAuth 2.0** : Authentification IAM basée sur tokens pour accès programmatique
+- **Type** : **Identity and Access Management (IAM)**
+- **Scope** : Blob, Queue, Table Storage (pas SMB pour Files)
+- **Méthode** : Utilisée par applications, service principals, managed identities
+
+**⚠️ Différence Kerberos vs OAuth pour Identity-Based :**
+
+| Aspect | Kerberos (Azure Files SMB) | OAuth 2.0 (Blob/Queue/Table) |
+|--------|---------------------------|------------------------------|
+| **Protocol** | Kerberos (SMB) | OAuth 2.0 (REST API) |
+| **Usage** | Mappage réseau, utilisateurs finaux | Applications, services, APIs |
+| **SSO** | ✅ Oui (Windows integrated) | ⚠️ Via managed identities |
+| **Permissions** | RBAC + NTFS ACLs | RBAC uniquement |
+| **Exam Focus** | ✅ Identity-based access | ⚠️ Programmatic access |
+
+**Utilisation Azure AD pour Blob Storage :**
+
+```bash
+# Authentification avec Azure AD (pas de clés)
+az login
+
+# Accès à un blob avec identité
+az storage blob download \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --file ./myblob.txt \
+  --auth-mode login
+
+# Via Managed Identity dans une application
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobServiceClient
+
+credential = DefaultAzureCredential()
+blob_service_client = BlobServiceClient(
+    account_url="https://mystorageaccount.blob.core.windows.net",
+    credential=credential
+)
+```
+
+**Rôles RBAC pour Blob Storage :**
+- **Storage Blob Data Reader** : Lecture seule
+- **Storage Blob Data Contributor** : Lecture + écriture
+- **Storage Blob Data Owner** : Full control + ACLs (ADLS Gen2)
+
+---
+
+### 3. Shared Key (Account Key) - CREDENTIAL-BASED
+
+**Définition :**
+- **Shared Key** : Clé secrète du compte de stockage (512-bit)
+- **Type** : **Credential-based** (NOT IAM)
+- **Scope** : Tous les services (Blob, File, Queue, Table)
+- **Permissions** : Accès COMPLET au compte de stockage
+
+**⚠️ Important :**
+- ❌ **PAS de l'IAM** : C'est une clé partagée, pas basé sur l'identité
+- ❌ **Trop de privilèges** : Accès complet à toutes les ressources
+- ⚠️ **À éviter** : Utiliser Azure AD ou SAS quand possible
+
+**Utilisation :**
+
+```bash
+# Via Azure CLI
+az storage blob download \
+  --account-name mystorageaccount \
+  --account-key "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --file ./myblob.txt
+```
+
+**Rotation des Clés :**
+
+```bash
+# Régénérer key1
+az storage account keys renew \
+  --account-name mystorageaccount \
+  --resource-group myResourceGroup \
+  --key key1
+
+# Processus recommandé :
+# 1. Applications utilisent key1
+# 2. Régénérer key2
+# 3. Basculer applications vers key2
+# 4. Régénérer key1
+# 5. Répéter tous les 90 jours
+```
+
+---
+
+### 4. Shared Access Signature (SAS) - CREDENTIAL-BASED avec Délégation
+
+**Définition :**
+- **SAS** : Token d'accès délégué avec permissions limitées
+- **Type** : **Credential-based** (sauf User Delegation SAS qui est IAM)
+- **Scope** : Granulaire (ressource spécifique)
+- **Avantage** : Délégation sécurisée sans partager clés du compte
+
+**⚠️ 3 Types de SAS et leur Relation avec IAM :**
+
+| Type SAS | Basé sur | IAM ou Credential | Scope |
+|----------|----------|-------------------|-------|
+| **User Delegation SAS** | Azure AD (OAuth) | ✅ **IAM** | Blob, ADLS Gen2 |
+| **Service SAS** | Account Key | ❌ Credential | 1 service |
+| **Account SAS** | Account Key | ❌ Credential | Multi-services |
+
+**⚠️ Seul User Delegation SAS est considéré IAM !**
+
+```bash
+# User Delegation SAS (IAM) - Recommandé
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --permissions r \
+  --expiry 2024-12-31T23:59:59Z \
+  --auth-mode login \
+  --as-user
+
+# Service SAS (Credential-based)
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --account-key "xxxx" \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --permissions r \
+  --expiry 2024-12-31T23:59:59Z
+```
+
+---
+
+### 5. Anonymous Public Access - NO AUTHENTICATION
+
+**Définition :**
+- **Anonymous Public Access** : Accès public sans authentification
+- **Type** : **Aucune authentification**
+- **Scope** : Blob Storage uniquement (containers et blobs)
+- **Use Case** : Contenu public (images, CSS, JS pour websites)
+
+**Configuration :**
+
+```bash
+# Activer anonymous access sur le storage account
+az storage account update \
+  --name mystorageaccount \
+  --resource-group myResourceGroup \
+  --allow-blob-public-access true
+
+# Configurer anonymous access sur un container
+az storage container set-permission \
+  --name mycontainer \
+  --account-name mystorageaccount \
+  --public-access blob
+
+# Niveaux :
+# --public-access off : Pas d'accès anonyme
+# --public-access blob : Accès blob individuel
+# --public-access container : Accès container + blobs
+```
+
+**⚠️ Sécurité :**
+- ❌ **Risque** : Données accessibles publiquement
+- ✅ **Best Practice** : Désactiver par défaut au niveau compte
+- ✅ **Audit** : Vérifier régulièrement les containers publics
+
+---
+
+### Tableau Récapitulatif - Méthodes d'Authentification par Service
+
+**⚠️ À CONNAÎTRE PAR CŒUR pour l'Examen AZ-104 :**
+
+| Service | Kerberos (IAM) | Azure AD OAuth (IAM) | Shared Key | SAS | Anonymous |
+|---------|----------------|----------------------|------------|-----|-----------|
+| **Azure Files (SMB)** | ✅ **SEUL service avec Kerberos** | ⚠️ REST API uniquement | ✅ Oui | ✅ Oui | ❌ Non |
+| **Blob Storage** | ❌ Non | ✅ Oui (REST) | ✅ Oui | ✅ Oui | ✅ Oui |
+| **Queue Storage** | ❌ Non | ✅ Oui (REST) | ✅ Oui | ✅ Oui | ❌ Non |
+| **Table Storage** | ❌ Non | ✅ Oui (REST) | ✅ Oui | ✅ Oui | ❌ Non |
+
+**⚠️ Scénarios d'Examen par Méthode :**
+
+**Scénario 1 : Utilisateurs Finaux Accédant à File Shares**
+
+```
+Requirement : Les employés doivent accéder à des file shares avec leurs identités Azure AD
+Question : Quelle méthode utiliser ?
+
+Réponse : Microsoft Entra Kerberos ✅
+
+Configuration :
+1. Activer Microsoft Entra Kerberos sur storage account
+2. Assigner RBAC (Storage File Data SMB Share Contributor)
+3. Configurer NTFS permissions
+4. Utilisateurs mappent le lecteur avec Azure\user@contoso.com
+
+Type : IAM (Identity-Based Access)
+```
+
+**Scénario 2 : Application Azure VM Accédant à Blob Storage**
+
+```
+Requirement : VM doit lire/écrire des blobs sans clés dans le code
+Question : Quelle méthode utiliser ?
+
+Réponse : Managed Identity + Azure AD RBAC ✅
+
+Configuration :
+1. Activer System-Assigned Managed Identity sur VM
+2. Assigner RBAC (Storage Blob Data Contributor)
+3. Application utilise DefaultAzureCredential()
+
+Type : IAM (Identity-Based Access via OAuth)
+```
+
+**Scénario 3 : Partage Temporaire avec Client Externe**
+
+```
+Requirement : Partager un fichier avec un partenaire externe pour 7 jours
+Question : Quelle méthode utiliser ?
+
+Réponse : User Delegation SAS ✅ (si Blob) ou Service SAS (si File)
+
+Configuration :
+1. User Delegation SAS pour Blobs (IAM)
+2. Service SAS pour Files (Credential)
+3. Expiration 7 jours
+4. HTTPS uniquement
+
+Type : IAM (User Delegation) ou Credential (Service SAS)
+```
+
+**Scénario 4 : Website Statique Public**
+
+```
+Requirement : Images et CSS doivent être accessibles publiquement
+Question : Quelle méthode utiliser ?
+
+Réponse : Anonymous Public Access ✅
+
+Configuration :
+1. Activer anonymous access sur storage account
+2. Container public-access level = blob
+3. Uploader images dans container
+
+Type : Aucune authentification
+```
+
+**⚠️ Erreurs Courantes QCM :**
+
+| Question | Réponse Incorrecte ❌ | Réponse Correcte ✅ |
+|----------|----------------------|---------------------|
+| **"Quel service supporte Kerberos identity-based access ?"** | "Blob Storage" | "Azure Files (SMB) uniquement" |
+| **"User Delegation SAS est IAM ?"** | "Non, c'est credential-based" | "Oui, basé sur Azure AD (IAM)" |
+| **"Account Key est identity-based ?"** | "Oui, lié à l'account" | "Non, c'est credential-based (clé partagée)" |
+| **"Blob Storage supporte identity-based access ?"** | "Non, seulement clés" | "Oui, via Azure AD OAuth (mais pas Kerberos)" |
+| **"Peut-on utiliser Kerberos pour Queues ?"** | "Oui, comme Files" | "Non, Kerberos = Azure Files SMB uniquement" |
+
+**⚠️ Différence IAM vs Credential - Points Clés :**
+
+**Identity-Based (IAM) :**
+- ✅ Authentification basée sur QUI vous êtes (identité)
+- ✅ Pas de secrets dans le code
+- ✅ Révocation via Azure AD
+- ✅ Audit trail complet
+- ✅ **Exemples** : Kerberos (Files SMB), Azure AD OAuth, User Delegation SAS, Managed Identities
+
+**Credential-Based :**
+- ⚠️ Authentification basée sur CE QUE vous avez (secret)
+- ❌ Secrets/clés à gérer
+- ⚠️ Révocation = rotation clés
+- ⚠️ Moins d'audit trail
+- ⚠️ **Exemples** : Account Key, Service SAS, Account SAS
+
+**⚠️ Points Clés pour l'Examen :**
+- ✅ **Kerberos = IAM = Azure Files SMB UNIQUEMENT**
+- ✅ **Identity-based access** dans questions d'examen = Chercher **Kerberos** ou **Azure Files**
+- ✅ **User Delegation SAS** = Seul SAS qui est IAM (Blob/ADLS Gen2)
+- ✅ **OAuth 2.0** = IAM mais via REST API (pas mappage réseau)
+- ✅ **Account Key** = PAS IAM (credential-based)
+- ✅ **RBAC requis** pour toutes les méthodes IAM
+- ✅ **Microsoft Entra Kerberos** = Nouveau nom pour Azure AD Kerberos (2024)
+- ✅ **3 niveaux** : RBAC (share-level) + NTFS (file-level) + Azure AD (tenant-level)
 
 ### Azure File Sync
 
