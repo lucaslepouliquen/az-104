@@ -632,17 +632,449 @@ App Service → Authentication/Authorization
 
 ### 3.4 Azure Container Instances (ACI)
 
-#### Caractéristiques
-- **Serverless containers** : Pas de gestion d'infrastructure
-- **Billing per second** : Facturation à la seconde
-- **Quick start** : Démarrage en secondes
-- **Support** : Linux et Windows containers
+**⚠️ Concept Clé pour AZ-104 : ACI est le moyen le plus simple et rapide d'exécuter des containers dans Azure sans gérer de serveurs**
 
-#### Use Cases
-- **Burst workloads** : Scaling rapide
-- **Build agents** : CI/CD pipelines
-- **Data processing** : Jobs batch
-- **Development/testing** : Environnements temporaires
+**Définition :**
+- **Azure Container Instances (ACI)** : Service serverless pour exécuter des containers Docker dans Azure
+- **Pas d'infrastructure** : Aucune VM, orchestrateur, ou cluster à gérer
+- **Démarrage rapide** : Containers disponibles en secondes
+- **Facturation** : Pay-per-second (facturé à la seconde d'exécution)
+- **Isolation** : Chaque container groupe est isolé dans son propre sandbox
+
+**Caractéristiques Principales :**
+
+**1. Serverless Containers**
+- ✅ **Pas de gestion d'infrastructure** : Azure gère tout
+- ✅ **Pas de VM à provisionner** : Containers s'exécutent directement sur l'infrastructure Azure
+- ✅ **Pas d'orchestrateur requis** : Pas besoin de Kubernetes, Docker Swarm, etc.
+- ✅ **Démarrage instantané** : Containers disponibles en quelques secondes
+
+**2. Facturation à la Seconde**
+- **Facturation** : Pay-per-second (facturé à la seconde d'exécution)
+- **Avantage** : Coût optimal pour workloads intermittents
+- **Exemple** : Container qui tourne 2h30 = facturé pour exactement 9000 secondes
+- **Comparaison** : VMs = facturées à l'heure (minimum 1h même si arrêtée après 5 min)
+
+**3. Support Multi-OS**
+- **Linux containers** : Toutes les images Linux standard
+- **Windows containers** : Windows Server Core, Nano Server
+- **Images** : Docker Hub, Azure Container Registry (ACR), autres registries
+
+**4. Isolation et Sécurité**
+- **Isolation** : Chaque container groupe est isolé
+- **Network isolation** : VNet integration possible (delegated subnet)
+- **Managed Identity** : Support des identités managées Azure AD
+- **Secrets** : Support Azure Key Vault pour secrets
+
+**Architecture ACI :**
+
+```
+┌─────────────────────────────────────────┐
+│      Azure Container Instances         │
+├─────────────────────────────────────────┤
+│  Container Group 1                     │
+│  ├── Container A (nginx)                │
+│  ├── Container B (app)                  │
+│  └── Shared Volume (Azure Files)        │
+├─────────────────────────────────────────┤
+│  Container Group 2                      │
+│  └── Container C (batch job)            │
+└─────────────────────────────────────────┘
+```
+
+**Container Groups :**
+- **Définition** : Collection de containers qui partagent ressources et réseau
+- **Ressources partagées** : CPU, RAM, réseau, volumes
+- **Lifecycle** : Tous les containers démarrent/arrêtent ensemble
+- **Use case** : Sidecar pattern (app + logging container)
+
+**Création d'un Container Instance :**
+
+**Via Azure CLI :**
+```bash
+# Créer un container simple (Linux)
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image mcr.microsoft.com/azuredocs/aci-helloworld:latest \
+  --dns-name-label myapp \
+  --ports 80 \
+  --cpu 1 \
+  --memory 1.5
+
+# Créer avec variables d'environnement
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image myregistry.azurecr.io/myapp:latest \
+  --registry-login-server myregistry.azurecr.io \
+  --registry-username myregistry \
+  --registry-password $ACR_PASSWORD \
+  --environment-variables \
+    DATABASE_URL='https://mydb.azure.com' \
+    API_KEY='secret123' \
+  --cpu 2 \
+  --memory 4
+
+# Créer avec command override
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image alpine:latest \
+  --command-line "ping -c 10 8.8.8.8" \
+  --restart-policy Never
+```
+
+**Via Azure Portal :**
+```
+Container Instances → Create → Configure:
+- Container name
+- Image source (Docker Hub, ACR, etc.)
+- OS type (Linux/Windows)
+- Size (CPU cores, Memory)
+- Networking (Public IP, DNS name)
+- Environment variables
+- Restart policy
+```
+
+**Configuration Avancée :**
+
+**1. Container Groups Multi-Containers :**
+```bash
+# Créer un container group avec plusieurs containers
+az container create \
+  --resource-group myRG \
+  --name mycontainergroup \
+  --image mcr.microsoft.com/azuredocs/aci-helloworld:latest \
+  --cpu 2 \
+  --memory 3 \
+  --ip-address Public \
+  --ports 80 \
+  --container-name webapp \
+  --registry-login-server myregistry.azurecr.io \
+  --registry-username myregistry \
+  --registry-password $ACR_PASSWORD
+
+# Ajouter un second container au groupe (via YAML)
+az container create \
+  --resource-group myRG \
+  --name mycontainergroup \
+  --yaml container-group.yaml
+```
+
+**Fichier container-group.yaml :**
+```yaml
+apiVersion: 2018-10-01
+location: eastus
+name: mycontainergroup
+properties:
+  containers:
+  - name: webapp
+    properties:
+      image: myregistry.azurecr.io/webapp:latest
+      resources:
+        requests:
+          cpu: 1
+          memoryInGb: 1.5
+      ports:
+      - port: 80
+        protocol: TCP
+  - name: sidecar
+    properties:
+      image: myregistry.azurecr.io/logging:latest
+      resources:
+        requests:
+          cpu: 0.5
+          memoryInGb: 0.5
+  osType: Linux
+  restartPolicy: Always
+  ipAddress:
+    type: Public
+    ports:
+    - protocol: tcp
+      port: 80
+    dnsNameLabel: myapp
+```
+
+**2. Volumes et Stockage :**
+
+**Types de Volumes Supportés :**
+- **Azure Files Share** : Partages SMB montés (persistants)
+- **Git Repo** : Clone un repo Git dans le container
+- **Empty Directory** : Volume temporaire (perdu à l'arrêt)
+- **Secret Volume** : Secrets depuis Azure Key Vault
+
+```bash
+# Créer avec Azure Files volume
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image myapp:latest \
+  --azure-file-volume-share-name myshare \
+  --azure-file-volume-account-name mystorageaccount \
+  --azure-file-volume-account-key $STORAGE_KEY \
+  --azure-file-volume-mount-path /mnt/azure \
+  --cpu 1 \
+  --memory 1.5
+
+# Créer avec Git repo volume
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image alpine/git:latest \
+  --gitrepo-url https://github.com/Azure-Samples/aci-helloworld.git \
+  --gitrepo-mount-path /mnt/repo \
+  --command-line "ls /mnt/repo" \
+  --restart-policy Never
+```
+
+**3. Restart Policies :**
+
+| Policy | Comportement | Use Case |
+|--------|-------------|----------|
+| **Always** (Default) | Redémarre automatiquement si arrêté | Applications long-running |
+| **OnFailure** | Redémarre seulement si erreur (exit code ≠ 0) | Jobs avec retry |
+| **Never** | Ne redémarre jamais | Jobs batch, one-time tasks |
+
+```bash
+# Container avec restart policy Never (job batch)
+az container create \
+  --resource-group myRG \
+  --name batchjob \
+  --image myapp:latest \
+  --restart-policy Never \
+  --command-line "python process_data.py"
+```
+
+**4. Networking :**
+
+**Options de Networking :**
+- **Public IP** : Accès Internet public (avec DNS name label optionnel)
+- **VNet Integration** : Container dans un subnet délégué (ACI subnet)
+- **Private IP** : IP privée dans VNet uniquement
+
+```bash
+# Container avec IP publique et DNS name
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image nginx:latest \
+  --dns-name-label myapp \
+  --ports 80 \
+  --ip-address Public
+
+# URL accessible : http://myapp.eastus.azurecontainer.io
+
+# Container avec VNet integration
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image myapp:latest \
+  --vnet myVNet \
+  --subnet aci-subnet \
+  --ip-address Private
+```
+
+**⚠️ Prérequis VNet Integration :**
+- Subnet délégué à `Microsoft.ContainerInstance/containerGroups`
+- Subnet avec au moins 32 adresses IP (/27 minimum)
+- NSG configuré pour autoriser le trafic
+
+**5. Managed Identities :**
+
+```bash
+# Créer container avec System-Assigned Managed Identity
+az container create \
+  --resource-group myRG \
+  --name mycontainer \
+  --image myapp:latest \
+  --assign-identity \
+  --cpu 1 \
+  --memory 1.5
+
+# Assigner RBAC role à l'identité
+az role assignment create \
+  --assignee $(az container show --name mycontainer --resource-group myRG --query identity.principalId -o tsv) \
+  --role "Storage Blob Data Reader" \
+  --scope /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Storage/storageAccounts/mystorageaccount
+```
+
+**Limites et Quotas :**
+
+| Ressource | Limite | Notes |
+|-----------|--------|-------|
+| **CPU par container** | 1-4 cores | Dépend de la région |
+| **RAM par container** | 0.5-16 GB | Dépend de la région |
+| **Containers par groupe** | 60 | Maximum |
+| **Volumes par groupe** | 20 | Azure Files, Git, Empty, Secret |
+| **Ports par groupe** | 5 | Ports TCP/UDP exposés |
+| **Container groups par région** | 50 | Par défaut (augmentable) |
+| **Taille image** | 15 GB | Maximum |
+
+**Use Cases Détaillés :**
+
+**1. Burst Workloads et Scaling Événementiel**
+```
+Scénario : Site e-commerce avec pic de trafic Black Friday
+Solution : ACI pour gérer le trafic supplémentaire
+Avantage : Démarrage en secondes, facturation à la seconde
+```
+
+**2. CI/CD Build Agents**
+```
+Scénario : Agents de build Azure DevOps
+Solution : ACI comme agents auto-hébergés
+Avantage : Pas de VM à maintenir, scaling automatique
+```
+
+**3. Jobs Batch et Data Processing**
+```
+Scénario : Traitement de données quotidien
+Solution : Container ACI avec restart policy Never
+Avantage : Coût optimal (payé seulement pendant exécution)
+```
+
+**4. Development/Testing Environnements**
+```
+Scénario : Environnements temporaires pour tests
+Solution : ACI avec images de dev
+Avantage : Création/destruction rapide, coût minimal
+```
+
+**5. Microservices Simple (sans orchestrateur)**
+```
+Scénario : Application simple avec 2-3 microservices
+Solution : Container groups avec plusieurs containers
+Avantage : Pas besoin de Kubernetes pour cas simples
+```
+
+**6. Scheduled Tasks**
+```
+Scénario : Tâches planifiées (cron jobs)
+Solution : ACI + Azure Logic Apps / Event Grid
+Avantage : Serverless, pas de VM à maintenir
+```
+
+**Monitoring et Logs :**
+
+```bash
+# Afficher les logs d'un container
+az container logs \
+  --resource-group myRG \
+  --name mycontainer
+
+# Suivre les logs en temps réel (tail -f)
+az container attach \
+  --resource-group myRG \
+  --name mycontainer
+
+# Afficher l'état et métriques
+az container show \
+  --resource-group myRG \
+  --name mycontainer \
+  --query "{Status:containers[0].instanceView.currentState.state,CPU:containers[0].resources.requests.cpu,Memory:containers[0].resources.requests.memoryInGb}"
+
+# Lister tous les containers
+az container list \
+  --resource-group myRG \
+  --output table
+```
+
+**Gestion du Lifecycle :**
+
+```bash
+# Démarrer un container arrêté
+az container start \
+  --resource-group myRG \
+  --name mycontainer
+
+# Arrêter un container
+az container stop \
+  --resource-group myRG \
+  --name mycontainer
+
+# Redémarrer un container
+az container restart \
+  --resource-group myRG \
+  --name mycontainer
+
+# Supprimer un container
+az container delete \
+  --resource-group myRG \
+  --name mycontainer \
+  --yes
+```
+
+**Comparaison ACI vs Autres Services :**
+
+| Critère | ACI | VMs | App Service | AKS |
+|---------|-----|-----|-------------|-----|
+| **Démarrage** | ⚡ Secondes | ⏱️ Minutes | ⚡ Secondes | ⏱️ Minutes |
+| **Gestion infrastructure** | ✅ Aucune | ❌ Complète | ✅ Aucune | ⚠️ Partielle |
+| **Orchestration** | ❌ Non | ❌ Non | ❌ Non | ✅ Oui (K8s) |
+| **Scaling** | ⚠️ Manuel | ⚠️ Manuel | ✅ Auto | ✅ Auto |
+| **Coût (workload intermittent)** | ✅ Optimal | ❌ Élevé | ⚠️ Moyen | ❌ Élevé |
+| **Multi-containers** | ✅ Oui (groups) | ✅ Oui | ❌ Non | ✅ Oui |
+| **VNet Integration** | ✅ Oui | ✅ Oui | ✅ Oui | ✅ Oui |
+| **Use Case** | Jobs, burst | Custom OS | Web apps | Production K8s |
+
+**Scénarios d'Examen AZ-104 :**
+
+**Question Type 1 : Workload Intermittent**
+```
+Scénario : Application qui tourne 2h/jour, besoin de démarrage rapide
+Question : Quelle solution avec coût minimal et effort admin minimal ?
+
+Réponse : Azure Container Instances ✅
+
+Justification :
+- Facturation à la seconde (optimal pour intermittent)
+- Pas d'infrastructure à gérer
+- Démarrage en secondes
+- Pas besoin d'orchestrateur pour cas simple
+```
+
+**Question Type 2 : CI/CD Build Agents**
+```
+Scénario : Besoin d'agents de build pour Azure DevOps, pas de maintenance
+Question : Quelle solution serverless ?
+
+Réponse : ACI avec auto-scaling ✅
+
+Justification :
+- Pas de VM à maintenir
+- Agents créés à la demande
+- Coût optimal (payé seulement pendant builds)
+```
+
+**Question Type 3 : ACI vs AKS**
+```
+Scénario : Application simple avec 2 containers, pas de scaling complexe
+Question : ACI ou AKS ?
+
+Réponse : ACI ✅ (si pas besoin orchestration avancée)
+
+Justification :
+- ACI = Plus simple, moins de coût
+- AKS = Overkill pour cas simple
+- AKS = Nécessaire si besoin auto-scaling, service mesh, etc.
+```
+
+**Best Practices ACI :**
+
+✅ **À FAIRE :**
+- Utiliser **Azure Container Registry (ACR)** pour images privées
+- Configurer **restart policy** appropriée (Always/OnFailure/Never)
+- Utiliser **Managed Identities** pour accès sécurisé aux ressources
+- Monitorer avec **Azure Monitor** et logs
+- Utiliser **VNet integration** pour workloads sensibles
+- Optimiser **taille images** (images légères = démarrage plus rapide)
+
+❌ **À ÉVITER :**
+- Utiliser ACI pour applications long-running 24/7 (coût élevé vs VMs)
+- Hardcoder secrets dans images (utiliser Key Vault)
+- Oublier de configurer restart policy (Always par défaut peut être inapproprié)
+- Utiliser ACI pour workloads nécessitant orchestration complexe (préférer AKS)
 
 ### 3.5 Infrastructure as Code (IaC) - ARM, Bicep, Terraform
 
@@ -1755,5 +2187,525 @@ Export-AzResourceGroup `
   -Path "exported-template.json" `
   -Force
 ```
+
+### 3.6 Azure Kubernetes Service (AKS) - Basics
+
+**⚠️ Concept Clé pour AZ-104 : AKS est le service managé Kubernetes d'Azure pour orchestrer des containers en production**
+
+**Définition :**
+- **Azure Kubernetes Service (AKS)** : Service managé Kubernetes pour déployer, gérer et scaler des applications containerisées
+- **Kubernetes (K8s)** : Orchestrateur open-source pour automatiser le déploiement, scaling et gestion de containers
+- **Managed Service** : Azure gère les masters (control plane), vous gérez les nodes (worker nodes)
+- **Use Case** : Applications production nécessitant orchestration, auto-scaling, service discovery, load balancing
+
+**Architecture AKS :**
+
+```
+┌─────────────────────────────────────────────────────┐
+│         Azure Kubernetes Service (AKS)              │
+├─────────────────────────────────────────────────────┤
+│  Control Plane (Managed by Azure)                   │
+│  ├── API Server                                     │
+│  ├── etcd (state store)                             │
+│  ├── Scheduler                                      │
+│  └── Controller Manager                             │
+├─────────────────────────────────────────────────────┤
+│  Node Pool (Worker Nodes - Managed by You)          │
+│  ├── Node 1 (VM)                                    │
+│  │   ├── kubelet                                    │
+│  │   ├── kube-proxy                                  │
+│  │   └── Pods (containers)                          │
+│  ├── Node 2 (VM)                                    │
+│  │   └── Pods (containers)                          │
+│  └── Node 3 (VM)                                    │
+│      └── Pods (containers)                          │
+└─────────────────────────────────────────────────────┘
+```
+
+**Composants Clés Kubernetes :**
+
+**1. Control Plane (Managed by Azure)**
+- **API Server** : Point d'entrée pour toutes les requêtes (kubectl, dashboard)
+- **etcd** : Base de données distribuée pour état du cluster
+- **Scheduler** : Détermine sur quel node placer les pods
+- **Controller Manager** : Gère les controllers (replicas, deployments, etc.)
+- **Coût** : Gratuit (Azure gère et facture uniquement les nodes)
+
+**2. Nodes (Worker Nodes)**
+- **kubelet** : Agent sur chaque node qui communique avec l'API server
+- **kube-proxy** : Gère le networking et load balancing
+- **Pods** : Plus petite unité déployable (1 ou plusieurs containers)
+- **Coût** : Vous payez pour les VMs des nodes
+
+**3. Concepts Kubernetes Essentiels :**
+
+**Pods :**
+- **Définition** : Plus petite unité déployable dans Kubernetes
+- **Contenu** : 1 ou plusieurs containers (généralement 1)
+- **Lifecycle** : Éphémère (peuvent être recréés)
+- **Ressources partagées** : Pod partage réseau, storage, IP
+
+**Deployments :**
+- **Définition** : Gère le cycle de vie des pods (création, mise à jour, rollback)
+- **Replicas** : Nombre de copies de pods à maintenir
+- **Rolling Updates** : Mise à jour progressive sans downtime
+- **Rollback** : Retour à version précédente en cas de problème
+
+**Services :**
+- **Définition** : Abstraction réseau pour exposer pods
+- **Types** : ClusterIP (interne), LoadBalancer (externe), NodePort
+- **Load Balancing** : Distribution du trafic entre pods
+
+**Namespaces :**
+- **Définition** : Isolation logique des ressources
+- **Use Case** : Séparer dev/staging/prod, équipes
+- **Default** : `default`, `kube-system`, `kube-public`
+
+**Création d'un Cluster AKS :**
+
+**Via Azure CLI :**
+```bash
+# Créer un cluster AKS basique
+az aks create \
+  --resource-group myRG \
+  --name myAKSCluster \
+  --node-count 3 \
+  --node-vm-size Standard_D2s_v3 \
+  --generate-ssh-keys \
+  --location eastus
+
+# Créer avec node pool spécifique
+az aks create \
+  --resource-group myRG \
+  --name myAKSCluster \
+  --node-count 3 \
+  --node-vm-size Standard_D2s_v3 \
+  --enable-managed-identity \
+  --network-plugin azure \
+  --network-policy azure \
+  --location eastus
+
+# Créer avec Azure AD integration (RBAC)
+az aks create \
+  --resource-group myRG \
+  --name myAKSCluster \
+  --node-count 3 \
+  --enable-aad \
+  --aad-admin-group-object-ids <group-id> \
+  --location eastus
+```
+
+**Via Azure Portal :**
+```
+Kubernetes services → Create → Configure:
+- Cluster name
+- Resource group
+- Region
+- Kubernetes version
+- Node pool (size, count)
+- Authentication (Service Principal or Managed Identity)
+- Networking (CNI or kubenet)
+```
+
+**Configuration kubectl :**
+
+```bash
+# Installer kubectl (si pas déjà fait)
+az aks install-cli
+
+# Se connecter au cluster AKS
+az aks get-credentials \
+  --resource-group myRG \
+  --name myAKSCluster
+
+# Vérifier la connexion
+kubectl get nodes
+
+# Afficher les pods
+kubectl get pods --all-namespaces
+
+# Afficher les services
+kubectl get services
+```
+
+**Déploiement d'une Application :**
+
+**1. Créer un Deployment :**
+
+**Fichier deployment.yaml :**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+```
+
+**Déployer :**
+```bash
+# Créer le deployment
+kubectl apply -f deployment.yaml
+
+# Vérifier le deployment
+kubectl get deployments
+kubectl get pods
+
+# Afficher les détails
+kubectl describe deployment nginx-deployment
+```
+
+**2. Exposer avec un Service :**
+
+**Fichier service.yaml :**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+```
+
+**Déployer :**
+```bash
+# Créer le service
+kubectl apply -f service.yaml
+
+# Obtenir l'IP externe
+kubectl get service nginx-service
+
+# Accéder à l'application via l'IP externe
+```
+
+**Types de Services :**
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| **ClusterIP** (Default) | IP interne dans le cluster | Communication interne |
+| **LoadBalancer** | IP publique Azure Load Balancer | Exposer application Internet |
+| **NodePort** | Port exposé sur chaque node | Accès direct via node IP |
+| **ExternalName** | CNAME vers service externe | Intégration services externes |
+
+**Node Pools :**
+
+**Définition :**
+- **Node Pool** : Groupe de nodes avec même configuration (VM size, OS, etc.)
+- **Multiple Pools** : Possibilité d'avoir plusieurs node pools (ex: CPU-intensive, GPU, Windows)
+
+**Gestion des Node Pools :**
+```bash
+# Lister les node pools
+az aks nodepool list \
+  --resource-group myRG \
+  --cluster-name myAKSCluster
+
+# Ajouter un nouveau node pool
+az aks nodepool add \
+  --resource-group myRG \
+  --cluster-name myAKSCluster \
+  --name gpunodepool \
+  --node-count 2 \
+  --node-vm-size Standard_NC6s_v3 \
+  --enable-cluster-autoscaler \
+  --min-count 1 \
+  --max-count 5
+
+# Mettre à jour un node pool (scaling)
+az aks nodepool scale \
+  --resource-group myRG \
+  --cluster-name myAKSCluster \
+  --name nodepool1 \
+  --node-count 5
+
+# Supprimer un node pool
+az aks nodepool delete \
+  --resource-group myRG \
+  --cluster-name myAKSCluster \
+  --name gpunodepool
+```
+
+**Auto-Scaling :**
+
+**Cluster Autoscaler :**
+- **Fonction** : Ajuste automatiquement le nombre de nodes selon la demande
+- **Trigger** : Pods en attente (pending) = besoin de plus de nodes
+- **Scale Down** : Nodes sous-utilisés = suppression automatique
+
+```bash
+# Activer Cluster Autoscaler
+az aks update \
+  --resource-group myRG \
+  --name myAKSCluster \
+  --enable-cluster-autoscaler \
+  --min-count 1 \
+  --max-count 10
+
+# Configurer sur un node pool spécifique
+az aks nodepool update \
+  --resource-group myRG \
+  --cluster-name myAKSCluster \
+  --name nodepool1 \
+  --enable-cluster-autoscaler \
+  --min-count 2 \
+  --max-count 10
+```
+
+**Horizontal Pod Autoscaler (HPA) :**
+- **Fonction** : Ajuste le nombre de replicas de pods selon métriques (CPU, mémoire)
+- **Scope** : Au niveau deployment, pas au niveau cluster
+
+```bash
+# Créer un HPA
+kubectl autoscale deployment nginx-deployment \
+  --cpu-percent=70 \
+  --min=2 \
+  --max=10
+
+# Vérifier le HPA
+kubectl get hpa
+```
+
+**Networking AKS :**
+
+**Deux Modes de Networking :**
+
+**1. kubenet (Basic)**
+- **Réseau** : Azure gère les routes
+- **Limitation** : 400 nodes maximum par cluster
+- **Use Case** : Clusters simples, développement
+
+**2. Azure CNI (Advanced)**
+- **Réseau** : Pods obtiennent des IPs du subnet VNet
+- **Avantage** : Intégration native avec VNet Azure
+- **Limitation** : Besoin de planifier l'espace IP
+- **Use Case** : Production, intégration VNet
+
+```bash
+# Créer cluster avec Azure CNI
+az aks create \
+  --resource-group myRG \
+  --name myAKSCluster \
+  --network-plugin azure \
+  --vnet-subnet-id /subscriptions/{sub-id}/resourceGroups/myRG/providers/Microsoft.Network/virtualNetworks/myVNet/subnets/aks-subnet \
+  --node-count 3
+```
+
+**Sécurité AKS :**
+
+**1. Authentication et Authorization :**
+
+**Azure AD Integration (RBAC) :**
+```bash
+# Créer cluster avec Azure AD
+az aks create \
+  --resource-group myRG \
+  --name myAKSCluster \
+  --enable-aad \
+  --aad-admin-group-object-ids <group-id> \
+  --node-count 3
+```
+
+**RBAC Kubernetes :**
+- **Roles** : Permissions dans un namespace
+- **ClusterRoles** : Permissions cluster-wide
+- **RoleBindings** : Associe roles à utilisateurs/groups
+
+**2. Secrets Management :**
+
+**Kubernetes Secrets :**
+```bash
+# Créer un secret
+kubectl create secret generic mysecret \
+  --from-literal=username=admin \
+  --from-literal=password=secret123
+
+# Utiliser dans un pod
+# (référencé dans deployment.yaml)
+```
+
+**Azure Key Vault Integration :**
+- **Azure Key Vault Provider for Secrets Store CSI Driver**
+- **Use Case** : Secrets depuis Key Vault dans pods
+
+**3. Pod Security Policies / Pod Security Standards :**
+- **Restrictions** : Limiter capabilities des pods
+- **Use Case** : Sécurité renforcée, conformité
+
+**Monitoring et Logging :**
+
+**Azure Monitor pour Containers :**
+```bash
+# Activer Azure Monitor
+az aks enable-addons \
+  --resource-group myRG \
+  --name myAKSCluster \
+  --addons monitoring
+```
+
+**Logs :**
+- **Container Insights** : Métriques et logs des pods
+- **kube-audit** : Logs d'audit du cluster
+- **kube-apiserver** : Logs de l'API server
+
+**Commandes Utiles :**
+
+```bash
+# Afficher les nodes
+kubectl get nodes
+
+# Afficher les pods
+kubectl get pods
+kubectl get pods --all-namespaces
+
+# Afficher les deployments
+kubectl get deployments
+
+# Afficher les services
+kubectl get services
+
+# Afficher les logs d'un pod
+kubectl logs <pod-name>
+
+# Exécuter une commande dans un pod
+kubectl exec -it <pod-name> -- /bin/bash
+
+# Décrire une ressource
+kubectl describe pod <pod-name>
+
+# Supprimer une ressource
+kubectl delete deployment nginx-deployment
+kubectl delete service nginx-service
+
+# Mettre à jour un deployment
+kubectl set image deployment/nginx-deployment nginx=nginx:1.22
+
+# Rollback un deployment
+kubectl rollout undo deployment/nginx-deployment
+```
+
+**Comparaison AKS vs ACI vs VMs :**
+
+| Critère | AKS | ACI | VMs |
+|---------|-----|-----|-----|
+| **Orchestration** | ✅ Kubernetes complet | ❌ Non | ❌ Non |
+| **Auto-scaling** | ✅ Pods + Nodes | ⚠️ Manuel | ⚠️ Manuel |
+| **Service Discovery** | ✅ Natif | ❌ Non | ❌ Non |
+| **Load Balancing** | ✅ Natif | ⚠️ Manuel | ⚠️ Load Balancer séparé |
+| **Complexité** | ❌ Élevée | ✅ Faible | ⚠️ Moyenne |
+| **Coût** | ⚠️ Nodes + Control Plane (gratuit) | ✅ Pay-per-second | ⚠️ Par heure |
+| **Use Case** | Production, microservices | Jobs, burst, simple | Custom OS, legacy |
+| **Démarrage** | ⏱️ Minutes (cluster) | ⚡ Secondes | ⏱️ Minutes |
+
+**Scénarios d'Examen AZ-104 :**
+
+**Question Type 1 : Quand Utiliser AKS ?**
+```
+Scénario : Application microservices avec 10+ services, besoin auto-scaling
+Question : Quelle solution Azure ?
+
+Réponse : Azure Kubernetes Service (AKS) ✅
+
+Justification :
+- Orchestration Kubernetes nécessaire
+- Auto-scaling pods et nodes
+- Service discovery natif
+- Load balancing intégré
+```
+
+**Question Type 2 : AKS vs ACI**
+```
+Scénario : Application simple avec 2 containers, pas de scaling complexe
+Question : AKS ou ACI ?
+
+Réponse : ACI ✅ (si pas besoin orchestration)
+
+Justification :
+- ACI = Plus simple, moins de coût
+- AKS = Overkill pour cas simple
+- AKS = Nécessaire si besoin orchestration avancée
+```
+
+**Question Type 3 : Control Plane AKS**
+```
+Question : Qui gère le control plane AKS ?
+
+Réponse : Azure ✅
+
+Justification :
+- Control plane = Managed by Azure (gratuit)
+- Vous gérez uniquement les worker nodes
+- Azure gère : API Server, etcd, Scheduler, Controller Manager
+```
+
+**Limites et Quotas AKS :**
+
+| Ressource | Limite | Notes |
+|-----------|--------|-------|
+| **Clusters par subscription** | 50 | Par défaut |
+| **Nodes par cluster (kubenet)** | 400 | Maximum |
+| **Nodes par cluster (Azure CNI)** | 1000 | Maximum |
+| **Pods par node** | 30-250 | Dépend de la taille VM |
+| **Node pools par cluster** | 100 | Maximum |
+| **Services par cluster** | 5000 | Maximum |
+
+**Best Practices AKS :**
+
+✅ **À FAIRE :**
+- Utiliser **Managed Identity** au lieu de Service Principal
+- Activer **Azure AD integration** pour RBAC
+- Utiliser **Azure CNI** pour production (intégration VNet)
+- Configurer **Cluster Autoscaler** pour optimiser coûts
+- Activer **Azure Monitor** pour monitoring
+- Utiliser **Azure Container Registry (ACR)** pour images
+- Implémenter **Resource Quotas** et **Limit Ranges**
+- Utiliser **Namespaces** pour isolation
+- Configurer **Network Policies** pour sécurité réseau
+- Utiliser **Secrets** ou **Key Vault** pour credentials
+
+❌ **À ÉVITER :**
+- Utiliser AKS pour applications simples (préférer ACI ou App Service)
+- Oublier de configurer auto-scaling (coûts élevés)
+- Exposer services sensibles publiquement sans authentification
+- Hardcoder secrets dans images ou YAML
+- Ignorer les mises à jour de sécurité Kubernetes
+- Utiliser kubenet pour clusters > 50 nodes (préférer Azure CNI)
+
+**⚠️ Points Clés pour l'Examen :**
+- ✅ **Control Plane = Managed by Azure** (gratuit)
+- ✅ **Worker Nodes = Votre responsabilité** (coût)
+- ✅ **AKS = Orchestration complète** (vs ACI = simple)
+- ✅ **Auto-scaling** : Cluster Autoscaler (nodes) + HPA (pods)
+- ✅ **Networking** : kubenet (simple) vs Azure CNI (avancé)
+- ✅ **Azure AD Integration** : RBAC pour sécurité
+- ✅ **Use Case** : Production, microservices, orchestration complexe
 
 ---
