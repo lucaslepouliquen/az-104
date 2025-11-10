@@ -2228,6 +2228,20 @@ az storage account keys renew \
 | **Service SAS** | Account Key | ❌ Credential | 1 service |
 | **Account SAS** | Account Key | ❌ Credential | Multi-services |
 
+**Paramètres Obligatoires vs Optionnels :**
+
+**Pour Account SAS :**
+- ✅ **ss (SignedServices)** : OBLIGATOIRE
+- ✅ **srt (SignedResourceTypes)** : OBLIGATOIRE
+- ✅ **se (Expiry)** : OBLIGATOIRE
+- ⚠️ **st (Start)** : Optionnel
+- ⚠️ **sip (IP)** : Optionnel
+
+**Pour Service SAS :**
+- ✅ **sr (SignedResource)** : OBLIGATOIRE
+- ✅ **se (Expiry)** : OBLIGATOIRE
+- ⚠️ **st (Start)** : Optionnel
+
 **⚠️ Seul User Delegation SAS est considéré IAM !**
 
 ```bash
