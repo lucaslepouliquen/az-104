@@ -3,7 +3,7 @@
 ### 4.1 Virtual Networks (VNet)
 
 #### Concepts Fondamentaux
-- **Address Space** : Plage CIDR privée 10.0.0.0/8 (16M d'adresses), 172.16.0.0/12 (1M d'adresses), 192.168.0.0/16 (65k adresses)
+- **Address Space** : Plage CIDR privée 10.0.0.0/8 (16M d'adresses), 172.16.0.0/12 (1M d'adresses), 192.168.0.0/16 (65k adresses) 
 - **Subnets** : Subdivision du VNet
 - **Network Security Groups** : Firewalls au niveau subnet/NIC
 
@@ -608,6 +608,8 @@ az network lb rule update \
 | **Microservices** | 5-tuple (défaut) | Stateless, scalabilité max |
 
 **5. HA Ports (Standard SKU Only) - Pattern Avancé**
+
+Fonctionnalité Azure qui permet de load-balancer TOUS les ports TCP et UDP en même temps avec une seule règle, au lieu de créer une règle par port.
 
 **Configuration**
 ```bash
