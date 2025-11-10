@@ -16,6 +16,7 @@
   - [Protocoles Supportés](#protocoles-supportés)
   - [Types de File Shares](#types-de-file-shares-mise-à-jour-2024)
   - [Capacités et Limites](#capacités-et-limites-mise-à-jour-2024)
+  - [Azure File Sync](#azure-file-sync)
 - [2.4 Azure Data Lake Storage Gen2](#24-azure-data-lake-storage-gen2)
   - [Hierarchical Namespace](#hierarchical-namespace---concept-clé)
   - [Sécurité et Contrôle d'Accès](#sécurité-et-contrôle-daccès)
@@ -26,6 +27,11 @@
   - [Outils de Transfert](#outils-de-transfert-mise-à-jour-2024)
   - [Rôles et Permissions](#storage-account-roles-et-permissions-mise-à-jour-2024)
   - [Sécurité et Conformité](#sécurité-et-conformité-nouveautés-2024)
+- [2.6 Shared Access Signatures (SAS)](#26-shared-access-signatures-sas)
+  - [Types de SAS](#types-de-sas)
+  - [SAS Tokens et Permissions](#sas-tokens-et-permissions)
+  - [Stored Access Policies](#stored-access-policies)
+  - [Best Practices et Sécurité](#best-practices-et-sécurité)
 
 ---
 
@@ -867,6 +873,466 @@ $policy = Set-AzStorageAccountManagementPolicy `
 - **Azure Import/Export** : Support Blob Storage et Azure Files
 - **Nouveauté** : Support des identités managées pour Azure File Sync
 
+### Azure File Sync
+
+**⚠️ Concept Clé pour AZ-104 : Azure File Sync centralise vos partages de fichiers dans Azure Files tout en conservant la flexibilité, la performance et la compatibilité de Windows Server**
+
+**Définition :**
+- **Azure File Sync** : Service qui synchronise les fichiers entre des serveurs Windows on-premises et Azure Files
+- **Objectif** : Cache distribué d'Azure Files sur site, avec tiering cloud optionnel
+- **Use Case Principal** : Migration hybride, disaster recovery, consolidation de file servers
+
+**Architecture Azure File Sync :**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Azure (Cloud)                        │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │         Storage Sync Service                     │   │
+│  │    (Orchestration et gestion centrale)           │   │
+│  └──────────────┬──────────────────────────────────┘   │
+│                 │                                        │
+│  ┌──────────────▼──────────────────────────────────┐   │
+│  │        Azure File Share (Cloud Endpoint)         │   │
+│  │     ─────────────────────────────────────────    │   │
+│  │          Source centrale de vérité               │   │
+│  └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+                         ▲ ▼ Sync
+┌─────────────────────────────────────────────────────────┐
+│              On-Premises / Branch Offices                │
+│  ┌─────────────────┐  ┌─────────────────┐              │
+│  │  Windows Server │  │  Windows Server │              │
+│  │   (HQ Office)   │  │ (Branch Office) │              │
+│  │  ┌───────────┐  │  │  ┌───────────┐  │              │
+│  │  │Azure File │  │  │  │Azure File │  │              │
+│  │  │Sync Agent │  │  │  │Sync Agent │  │              │
+│  │  └─────┬─────┘  │  │  └─────┬─────┘  │              │
+│  │  ┌─────▼─────┐  │  │  ┌─────▼─────┐  │              │
+│  │  │ Registered│  │  │  │ Registered│  │              │
+│  │  │  Servers  │  │  │  │  Servers  │  │              │
+│  │  └───────────┘  │  │  └───────────┘  │              │
+│  └─────────────────┘  └─────────────────┘              │
+│     Server Endpoint       Server Endpoint               │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Composants Principaux :**
+
+**1. Storage Sync Service**
+- **Rôle** : Ressource Azure de niveau supérieur pour orchestrer la synchronisation
+- **Création** : Via Azure Portal, PowerShell ou CLI
+- **Région** : Doit être dans la même région que le Storage Account
+- **Gestion** : Point central pour tous les sync groups et registered servers
+
+**2. Sync Group**
+- **Définition** : Définit la topologie de synchronisation pour un ensemble de fichiers
+- **Contenu** : 1 Cloud Endpoint + 1 ou plusieurs Server Endpoints
+- **Limites** : Jusqu'à 100 sync groups par Storage Sync Service
+
+**3. Cloud Endpoint**
+- **Définition** : Azure File Share dans le cloud
+- **Limite** : Un seul cloud endpoint par sync group
+- **Requis** : Azure File Share doit être vide ou contenir uniquement des données à synchroniser
+
+**4. Server Endpoint**
+- **Définition** : Chemin spécifique sur un Windows Server enregistré (ex: D:\Shares\Finance)
+- **Limite** : Jusqu'à 100 server endpoints par sync group
+- **Contrainte** : Un seul server endpoint par volume (disque) sur un serveur
+
+**5. Registered Server**
+- **Définition** : Windows Server avec l'agent Azure File Sync installé
+- **Limite** : Jusqu'à 99 registered servers par Storage Sync Service
+- **Prérequis** : Windows Server 2016 ou supérieur (2019/2022 recommandé)
+
+**Installation et Configuration - Étapes Détaillées :**
+
+**Étape 1 : Prérequis**
+
+```powershell
+# Vérifier la version de Windows Server
+Get-ComputerInfo | Select-Object WindowsProductName, OSDisplayVersion
+
+# Versions supportées :
+# - Windows Server 2016 (minimum)
+# - Windows Server 2019 (recommandé)
+# - Windows Server 2022
+# - Azure Virtual Machines supportées
+
+# Vérifier la connectivité réseau
+Test-NetConnection -ComputerName file.core.windows.net -Port 443
+Test-NetConnection -ComputerName kailani-afs.one.microsoft.com -Port 443
+```
+
+**Étape 2 : Créer Storage Sync Service**
+
+```bash
+# Via Azure CLI
+az resource create \
+  --resource-group myResourceGroup \
+  --name myStorageSyncService \
+  --resource-type "Microsoft.StorageSync/storageSyncServices" \
+  --location "westeurope" \
+  --properties '{}'
+
+# Via PowerShell
+New-AzStorageSyncService `
+  -ResourceGroupName "myResourceGroup" `
+  -Name "myStorageSyncService" `
+  -Location "westeurope"
+```
+
+**Étape 3 : Installer Azure File Sync Agent sur Windows Server**
+
+```powershell
+# Télécharger et installer l'agent (PowerShell sur le serveur Windows)
+# Lien : https://go.microsoft.com/fwlink/?linkid=858257
+
+# Installation silencieuse
+Start-Process -FilePath "StorageSyncAgent.msi" -ArgumentList "/quiet /qn" -Wait
+
+# Vérifier l'installation
+Get-Module -ListAvailable -Name StorageSync
+```
+
+**Étape 4 : Enregistrer le Windows Server**
+
+```powershell
+# Se connecter à Azure
+Connect-AzAccount
+
+# Enregistrer le serveur
+Register-AzStorageSyncServer `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService"
+
+# Vérifier l'enregistrement
+Get-AzStorageSyncServer `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService"
+```
+
+**Étape 5 : Créer Sync Group**
+
+```powershell
+# Via PowerShell
+New-AzStorageSyncGroup `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService" `
+  -SyncGroupName "SyncGroup01"
+```
+
+**Étape 6 : Créer Cloud Endpoint**
+
+```powershell
+# Obtenir l'ID du Storage Account et File Share
+$storageAccount = Get-AzStorageAccount `
+  -ResourceGroupName "myResourceGroup" `
+  -Name "mystorageaccount"
+
+# Créer le cloud endpoint
+New-AzStorageSyncCloudEndpoint `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService" `
+  -SyncGroupName "SyncGroup01" `
+  -StorageAccountResourceId $storageAccount.Id `
+  -AzureFileShareName "myfileshare"
+```
+
+**Étape 7 : Créer Server Endpoint**
+
+```powershell
+# Obtenir le Registered Server ID
+$registeredServer = Get-AzStorageSyncServer `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService"
+
+# Créer le server endpoint
+New-AzStorageSyncServerEndpoint `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService" `
+  -SyncGroupName "SyncGroup01" `
+  -ServerId $registeredServer.ResourceId `
+  -ServerLocalPath "D:\Shares\Finance" `
+  -CloudTiering `
+  -VolumeFreeSpacePercent 20 `
+  -TierFilesOlderThanDays 30
+```
+
+**⚠️ Cloud Tiering - Fonctionnalité Clé :**
+
+**Définition :**
+- **Cloud Tiering** : Fonctionnalité optionnelle qui garde les fichiers fréquemment accédés en local et "tiers" les fichiers froids vers Azure
+- **Avantage** : Libère de l'espace disque local tout en maintenant l'accès transparent
+- **Fonctionnement** : Remplace les fichiers par des "reparse points" (pointeurs)
+
+**Politiques de Tiering :**
+
+**1. Volume Free Space Policy**
+```powershell
+# Conserver 20% d'espace libre sur le volume
+-VolumeFreeSpacePercent 20
+```
+- **Comportement** : Tiers automatiquement les fichiers les moins récemment accédés jusqu'à atteindre 20% d'espace libre
+- **Recommandé** : 20-30% pour équilibrer performance et capacité
+
+**2. Date Policy**
+```powershell
+# Tier les fichiers non accédés depuis 30 jours
+-TierFilesOlderThanDays 30
+```
+- **Comportement** : Les fichiers non accédés pendant X jours sont tiered vers le cloud
+- **Recommandé** : 7-60 jours selon les patterns d'accès
+
+**Fonctionnement du Tiering :**
+
+```
+Fichier Initial (Local)
+├── Taille : 100 MB
+└── Accès : Dernier accès il y a 45 jours
+
+     ▼ Tiering Policy Applied (TierFilesOlderThanDays 30)
+
+Fichier Tiered (Reparse Point Local)
+├── Taille locale : ~1 KB (métadonnées)
+├── Taille cloud : 100 MB (dans Azure File Share)
+└── Comportement : Transparent pour l'utilisateur
+
+Utilisateur ouvre le fichier
+     ▼ Automatic Recall
+
+Fichier Recalled (Local à nouveau)
+├── Téléchargement depuis Azure
+├── Fichier complet disponible localement
+└── Prochains accès instantanés
+```
+
+**Recall de Fichiers :**
+
+```powershell
+# Recall manuel d'un fichier spécifique
+Invoke-StorageSyncFileRecall -Path "D:\Shares\Finance\ImportantDoc.pdf"
+
+# Recall d'un dossier entier
+Invoke-StorageSyncFileRecall -Path "D:\Shares\Finance\Q4Reports" -Recurse
+
+# Vérifier l'état du tiering
+Get-StorageSyncFileTieringResult -Path "D:\Shares\Finance"
+```
+
+**⚠️ Limites et Contraintes Azure File Sync :**
+
+| Limite | Valeur | Notes |
+|--------|--------|-------|
+| **Storage Sync Services par subscription** | 100 | Par région Azure |
+| **Sync Groups par Storage Sync Service** | 200 | Anciennement 100, augmenté en 2024 |
+| **Cloud Endpoints par Sync Group** | 1 | Un seul Azure File Share |
+| **Server Endpoints par Sync Group** | 100 | Plusieurs serveurs possibles |
+| **Registered Servers par Storage Sync Service** | 99 | Windows Servers enregistrés |
+| **Taille maximale fichier** | 100 TiB | Pour Premium File Shares |
+| **Nombre de fichiers par volume** | ~100 millions | Dépend de la taille namespace |
+| **Longueur chemin maximum** | 2048 caractères | Limitation Windows |
+
+**⚠️ Scénarios d'Utilisation - Pour l'Examen :**
+
+**Scénario 1 : Consolidation de File Servers de Branches**
+
+```
+Problème : 
+- 20 bureaux régionaux avec leurs propres file servers
+- Données dupliquées et non synchronisées
+- Coût de maintenance élevé
+
+Solution Azure File Sync :
+1. Créer Azure File Share central (cloud endpoint)
+2. Installer agents sur les 20 serveurs locaux
+3. Créer 20 server endpoints dans le même sync group
+4. Activer cloud tiering pour optimiser l'espace disque local
+5. Résultat : Source de vérité unique dans Azure, accès local rapide
+
+Avantages :
+✅ Données centralisées dans Azure
+✅ Cache local pour performance
+✅ Synchronisation multi-sites automatique
+✅ Réduction coûts infrastructure
+```
+
+**Scénario 2 : Disaster Recovery**
+
+```
+Problème :
+- File server critique on-premises sans HA
+- RTO/RPO élevés en cas de panne
+- Backups traditionnels lents à restaurer
+
+Solution Azure File Sync :
+1. Synchroniser file server vers Azure Files
+2. En cas de panne du serveur :
+   - Monter Azure File Share directement depuis Azure VMs
+   - Ou restaurer sur nouveau serveur avec sync
+3. RTO < 1 heure au lieu de plusieurs heures
+
+Avantages :
+✅ Copie cloud automatique et continue
+✅ Récupération rapide
+✅ Pas besoin de restauration backup complète
+```
+
+**Scénario 3 : Lift and Shift avec Cache Local**
+
+```
+Problème :
+- Migration d'applications vers Azure
+- Applications nécessitent accès fichiers local rapide
+- Bande passante WAN limitée vers Azure
+
+Solution Azure File Sync :
+1. Azure File Share comme stockage primaire
+2. Azure File Sync sur Azure VMs pour cache local
+3. Cloud tiering pour optimiser stockage VM
+4. Fichiers fréquents en local (performance)
+5. Fichiers froids dans le cloud (coût)
+
+Avantages :
+✅ Performance locale maintenue
+✅ Capacité illimitée (Azure)
+✅ Coûts optimisés
+```
+
+**⚠️ Monitoring et Troubleshooting :**
+
+**Vérifier l'État de Synchronisation :**
+
+```powershell
+# Statut général du sync
+Get-AzStorageSyncServerEndpoint `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService" `
+  -SyncGroupName "SyncGroup01"
+
+# Activité de synchronisation récente
+Get-AzStorageSyncSyncSessionStatus `
+  -ResourceGroupName "myResourceGroup" `
+  -StorageSyncServiceName "myStorageSyncService" `
+  -SyncGroupName "SyncGroup01"
+
+# Fichiers non synchronisés (erreurs)
+Get-StorageSyncFileSyncActivity -ServerEndpointPath "D:\Shares\Finance"
+```
+
+**Logs de Diagnostic :**
+
+```
+Event Viewer (Windows Server) :
+- Applications and Services Logs
+  └── Microsoft
+      └── FileSync
+          └── Agent
+              ├── FileSyncEventLog
+              ├── FileSyncTelemetryLog
+              └── FileSyncRecallLog
+```
+
+**Métriques Azure Monitor :**
+
+```bash
+# Via Azure Portal
+Storage Sync Service → Monitoring → Metrics
+
+Métriques Clés :
+- Sync session result (success/failure)
+- Files synced
+- Bytes synced
+- Cloud tiering recall size
+- Cloud tiering recall throughput
+- Server online/offline status
+```
+
+**Problèmes Courants et Solutions :**
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| **Sync ne démarre pas** | Firewall bloque port 443 | Ouvrir ports 443 vers *.afs.azure.net |
+| **Fichiers ne sont pas tiered** | Cloud tiering désactivé | Vérifier `-CloudTiering` paramètre |
+| **Recall très lent** | Bande passante limitée | Augmenter QoS, vérifier throttling |
+| **Erreur "ECS_E_SYNC_METADATA_KNOWLEDGE_SOFT_LIMIT_REACHED"** | Trop de fichiers modifiés | Augmenter sync session, planifier syncs |
+| **Server endpoint health "No Activity"** | Agent non démarré | Redémarrer service FileSyncSvc |
+
+**⚠️ Erreurs Courantes QCM :**
+
+| Question | Réponse Incorrecte ❌ | Réponse Correcte ✅ |
+|----------|----------------------|---------------------|
+| **"Peut-on synchroniser entre 2 Azure File Shares directement ?"** | "Oui, avec Azure File Sync" | "Non, Azure File Sync synchronise serveurs Windows vers Azure Files" |
+| **"Cloud Tiering supprime les fichiers du cloud ?"** | "Oui, pour libérer espace" | "Non, garde fichiers dans Azure et libère espace local" |
+| **"Combien de cloud endpoints par sync group ?"** | "Illimité" ou "10" | "1 seul cloud endpoint par sync group" |
+| **"Azure File Sync fonctionne sur Linux ?"** | "Oui, avec agent Linux" | "Non, Windows Server uniquement" |
+| **"Peut-on avoir 2 server endpoints sur le même volume ?"** | "Oui, dans des dossiers différents" | "Non, un seul server endpoint par volume" |
+
+**Comparaison avec Alternatives :**
+
+| Solution | Use Case | Différence avec File Sync |
+|----------|----------|---------------------------|
+| **Azure Files Direct Mount** | Accès SMB simple sans cache | Pas de cache local, latence WAN complète |
+| **Azure File Sync** | Cache distribué + synchronisation | Cache local, sync multi-sites, cloud tiering |
+| **Storage Account Replication (GRS)** | Disaster Recovery stockage | Réplication au niveau stockage, pas de cache applicatif |
+| **DFS Replication** | Synchronisation on-premises uniquement | Pas de cloud, maintenance complexe |
+
+**Coûts Azure File Sync :**
+
+```
+Composants de Coût :
+1. Azure File Share stockage (selon tier et taille)
+2. Transactions de synchronisation (lectures/écritures)
+3. Egress data (recall depuis cloud)
+4. Storage Sync Service : GRATUIT
+5. Agent Azure File Sync : GRATUIT
+
+Optimisation :
+- Utiliser Cool tier pour fichiers rarement accédés
+- Activer cloud tiering pour réduire stockage local
+- Monitorer recall patterns pour ajuster policies
+```
+
+**⚠️ Best Practices :**
+
+**1. Planification**
+- ✅ Évaluer patterns d'accès fichiers avant déploiement
+- ✅ Dimensionner bande passante réseau (100 Mbps minimum recommandé)
+- ✅ Tester avec pilot group avant déploiement complet
+
+**2. Configuration**
+- ✅ Activer cloud tiering pour serveurs avec espace limité
+- ✅ Utiliser Date Policy (30-60 jours) ET Volume Free Space (20-30%)
+- ✅ Créer server endpoints au niveau racine de volume si possible
+
+**3. Sécurité**
+- ✅ Utiliser HTTPS uniquement (port 443)
+- ✅ Activer Azure AD authentication pour Azure Files
+- ✅ Appliquer RBAC sur Storage Sync Service
+- ✅ Activer encryption at rest et in transit
+
+**4. Monitoring**
+- ✅ Configurer alertes Azure Monitor pour sync failures
+- ✅ Vérifier health status quotidiennement
+- ✅ Monitorer métriques de tiering et recall
+
+**5. Maintenance**
+- ✅ Maintenir agents à jour (auto-update recommandé)
+- ✅ Vérifier espace disque régulièrement
+- ✅ Tester disaster recovery procedures
+
+**⚠️ Points Clés pour l'Examen :**
+- ✅ Azure File Sync = **Cache distribué** d'Azure Files sur Windows Server
+- ✅ **1 cloud endpoint** (Azure File Share) par sync group
+- ✅ **Jusqu'à 100 server endpoints** (serveurs Windows) par sync group
+- ✅ **Cloud Tiering** : Libère espace local, garde fichiers dans Azure
+- ✅ **Recall automatique** : Fichiers téléchargés à la demande depuis Azure
+- ✅ **Windows Server uniquement** : Pas de support Linux
+- ✅ **1 server endpoint par volume** : Contrainte importante
+- ✅ **Synchronisation bidirectionnelle** : Modifications synchronisées dans les deux sens
+- ✅ **Registered Server** : Windows Server avec agent installé
+- ✅ **Use Cases** : Consolidation file servers, DR, migration hybride
+
 ---
 
 ## 2.4 Azure Data Lake Storage Gen2
@@ -1399,3 +1865,708 @@ other::---             # Autres n'ont aucun droit
 - **Monitoring avancé** : Métriques de sécurité et alertes intelligentes
 
 ---
+
+## 2.6 Shared Access Signatures (SAS)
+
+**âš ï¸ Concept ClÃ© pour AZ-104 : Les Shared Access Signatures (SAS) fournissent un accÃ¨s dÃ©lÃ©guÃ© sÃ©curisÃ© aux ressources de stockage Azure sans partager les clÃ©s du compte**
+
+**DÃ©finition :**
+- **Shared Access Signature (SAS)** : URI qui accorde des droits d'accÃ¨s restreints aux ressources Azure Storage
+- **Objectif** : DÃ©lÃ©gation d'accÃ¨s granulaire avec contrÃ´le prÃ©cis des permissions et de la durÃ©e
+- **Avantage Principal** : Partage sÃ©curisÃ© sans exposer les clÃ©s du compte de stockage
+
+**Principe de Fonctionnement :**
+
+```
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚            Storage Account                          â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”‚
+â”‚  â”‚       Account Key (Ne JAMAIS partager)    â”‚     â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â”‚
+â”‚                   â”‚                                 â”‚
+â”‚                   â–¼ Signe le SAS Token              â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”‚
+â”‚  â”‚      SAS Token GÃ©nÃ©rÃ©                     â”‚     â”‚
+â”‚  â”‚  ?sv=2021-06-08&ss=b&srt=sco&sp=rwdlacx  â”‚     â”‚
+â”‚  â”‚  &se=2024-12-31T23:59:59Z&st=...&sig=... â”‚     â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                    â”‚
+                    â–¼ PartagÃ© avec
+         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+         â”‚   Application Tierce  â”‚
+         â”‚   ou Utilisateur      â”‚
+         â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                    â”‚
+                    â–¼ AccÃ¨s limitÃ© aux ressources
+         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+         â”‚   Blob / Container    â”‚
+         â”‚   (lecture seule, etc)â”‚
+         â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+```
+
+### Types de SAS
+
+**âš ï¸ Il existe 3 types principaux de SAS - Chacun avec des use cases spÃ©cifiques**
+
+**1. User Delegation SAS (RecommandÃ© - Plus SÃ©curisÃ©)**
+
+**CaractÃ©ristiques :**
+- **Authentification** : BasÃ©e sur Azure AD credentials (OAuth 2.0)
+- **Signature** : Utilise une User Delegation Key obtenue d'Azure AD
+- **Avantage** : NE nÃ©cessite PAS les clÃ©s du compte de stockage
+- **Scope** : Blob Storage et Data Lake Storage Gen2 uniquement
+- **SÃ©curitÃ©** : Meilleure pratique recommandÃ©e par Microsoft
+
+**CrÃ©ation - User Delegation SAS :**
+
+```bash
+# PrÃ©requis : Utilisateur doit avoir le rÃ´le "Storage Blob Data Contributor" ou supÃ©rieur
+
+# Ã‰tape 1 : Se connecter avec Azure AD
+az login
+
+# Ã‰tape 2 : GÃ©nÃ©rer User Delegation SAS
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --permissions r \
+  --expiry 2024-12-31T23:59:59Z \
+  --auth-mode login \
+  --as-user
+
+# Output : SAS Token
+# ?sv=2021-06-08&st=2024-01-01T00:00:00Z&se=2024-12-31T23:59:59Z&sr=b&sp=r&sig=...
+
+# Construire URL complÃ¨te
+https://mystorageaccount.blob.core.windows.net/mycontainer/myblob.txt?sv=2021-06-08&st=...&sig=...
+```
+
+**Via PowerShell avec Azure AD :**
+
+```powershell
+# Se connecter avec Azure AD
+Connect-AzAccount
+
+# Obtenir le contexte du Storage Account
+$ctx = New-AzStorageContext -StorageAccountName "mystorageaccount" -UseConnectedAccount
+
+# GÃ©nÃ©rer User Delegation SAS pour un blob
+$sasToken = New-AzStorageBlobSASToken `
+  -Context $ctx `
+  -Container "mycontainer" `
+  -Blob "myblob.txt" `
+  -Permission r `
+  -ExpiryTime (Get-Date).AddDays(7)
+
+# URL complÃ¨te
+$blobUri = $ctx.BlobEndPoint + "mycontainer/myblob.txt" + $sasToken
+Write-Output $blobUri
+```
+
+**âš ï¸ Avantages User Delegation SAS :**
+- âœ… **Pas de clÃ©s exposÃ©es** : N'utilise pas les clÃ©s du compte
+- âœ… **Azure AD integration** : RÃ©vocation via Azure AD
+- âœ… **Audit trail** : TraÃ§abilitÃ© complÃ¨te dans Azure AD logs
+- âœ… **Rotation automatique** : User Delegation Key rotÃ©e automatiquement
+- âœ… **Least privilege** : BasÃ© sur RBAC Azure AD
+
+**2. Service SAS**
+
+**CaractÃ©ristiques :**
+- **Authentification** : SignÃ©e avec la clÃ© du compte de stockage
+- **Scope** : Ressource spÃ©cifique dans UN seul service (Blob, Queue, Table, File)
+- **GranularitÃ©** : AccÃ¨s Ã  un blob, container, file share, queue, ou table
+- **Use Case** : DÃ©lÃ©gation d'accÃ¨s Ã  des ressources spÃ©cifiques
+
+**CrÃ©ation - Service SAS :**
+
+```bash
+# Service SAS pour un blob spÃ©cifique
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --account-key "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --permissions rw \
+  --expiry 2024-12-31T23:59:59Z \
+  --https-only
+
+# Service SAS pour un container entier
+az storage container generate-sas \
+  --account-name mystorageaccount \
+  --account-key "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  --name mycontainer \
+  --permissions rl \
+  --expiry 2024-12-31T23:59:59Z
+
+# Service SAS pour Azure File Share
+az storage share generate-sas \
+  --account-name mystorageaccount \
+  --account-key "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  --name myfileshare \
+  --permissions rl \
+  --expiry 2024-12-31T23:59:59Z
+```
+
+**Via PowerShell :**
+
+```powershell
+# Obtenir le contexte avec la clÃ© du compte
+$ctx = New-AzStorageContext -StorageAccountName "mystorageaccount" -StorageAccountKey "xxxx"
+
+# Service SAS pour blob
+$blobSAS = New-AzStorageBlobSASToken `
+  -Context $ctx `
+  -Container "mycontainer" `
+  -Blob "myblob.txt" `
+  -Permission rwd `
+  -ExpiryTime (Get-Date).AddHours(24) `
+  -Protocol HttpsOnly
+
+# Service SAS pour container
+$containerSAS = New-AzStorageContainerSASToken `
+  -Context $ctx `
+  -Name "mycontainer" `
+  -Permission rl `
+  -ExpiryTime (Get-Date).AddDays(7)
+```
+
+**3. Account SAS**
+
+**CaractÃ©ristiques :**
+- **Authentification** : SignÃ©e avec la clÃ© du compte de stockage
+- **Scope** : AccÃ¨s Ã  PLUSIEURS services (Blob, Queue, Table, File)
+- **GranularitÃ©** : OpÃ©rations au niveau du service ET de la ressource
+- **Use Case** : Applications nÃ©cessitant accÃ¨s multi-services
+
+**CrÃ©ation - Account SAS :**
+
+```bash
+# Account SAS donnant accÃ¨s Ã  Blob et File Services
+az storage account generate-sas \
+  --account-name mystorageaccount \
+  --account-key "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  --services bf \
+  --resource-types sco \
+  --permissions rl \
+  --expiry 2024-12-31T23:59:59Z \
+  --https-only
+
+# ParamÃ¨tres :
+# --services : b=Blob, f=File, q=Queue, t=Table
+# --resource-types : s=Service, c=Container, o=Object
+```
+
+**Via PowerShell :**
+
+```powershell
+# Account SAS avec accÃ¨s multi-services
+$accountSAS = New-AzStorageAccountSASToken `
+  -Service Blob,File `
+  -ResourceType Service,Container,Object `
+  -Permission rl `
+  -ExpiryTime (Get-Date).AddMonths(1) `
+  -Protocol HttpsOnly `
+  -Context $ctx
+
+Write-Output "Account SAS: $accountSAS"
+```
+
+**âš ï¸ Comparaison des 3 Types de SAS :**
+
+| CritÃ¨re | User Delegation SAS | Service SAS | Account SAS |
+|---------|---------------------|-------------|-------------|
+| **Authentification** | Azure AD (OAuth) | Account Key | Account Key |
+| **SÃ©curitÃ©** | âœ… Meilleure | âŒ ClÃ© exposÃ©e | âŒ ClÃ© exposÃ©e |
+| **Scope Services** | Blob, ADLS Gen2 | 1 service | Plusieurs services |
+| **RÃ©vocation** | âœ… Via Azure AD | âŒ Rotation clÃ© uniquement | âŒ Rotation clÃ© uniquement |
+| **Audit** | âœ… Azure AD logs | âš ï¸ Storage logs | âš ï¸ Storage logs |
+| **Use Case** | Applications modernes | AccÃ¨s ressource unique | Multi-services legacy |
+| **Recommandation** | âœ… PrÃ©fÃ©rÃ© | âš ï¸ Si User Delegation impossible | âŒ Ã‰viter si possible |
+
+### SAS Tokens et Permissions
+
+**âš ï¸ Structure d'un SAS Token :**
+
+```
+https://mystorageaccount.blob.core.windows.net/mycontainer/myblob.txt
+?sv=2021-06-08           # Storage Service Version
+&st=2024-01-01T00:00:00Z # Start Time (optionnel)
+&se=2024-12-31T23:59:59Z # Expiry Time (obligatoire)
+&sr=b                     # Signed Resource (b=blob, c=container)
+&sp=r                     # Signed Permissions (r=read)
+&sip=168.1.5.60-168.1.5.70 # Signed IP Range (optionnel)
+&spr=https               # Signed Protocol (https only)
+&sig=xxxxxxxxxxxxxx      # Signature (HMAC-SHA256)
+```
+
+**ParamÃ¨tres ClÃ©s :**
+
+**1. Signed Permissions (sp) :**
+
+**Pour Blobs :**
+- **r** : Read (lire contenu, propriÃ©tÃ©s, mÃ©tadonnÃ©es)
+- **a** : Add (ajouter des blocks Ã  un append blob)
+- **c** : Create (crÃ©er ou upload un blob)
+- **w** : Write (Ã©crire ou upload - Ã©crase le blob existant)
+- **d** : Delete (supprimer le blob)
+- **x** : Delete Version (supprimer une version de blob)
+- **y** : Permanent Delete (suppression permanente - soft delete)
+- **l** : List (lister les blobs dans un container)
+- **t** : Tags (lire/Ã©crire blob tags)
+- **m** : Move (rename blob - ADLS Gen2)
+- **e** : Execute (ADLS Gen2 - exÃ©cution rÃ©pertoire)
+
+**Pour Containers :**
+- **r** : Read
+- **a** : Add
+- **c** : Create
+- **w** : Write
+- **d** : Delete
+- **l** : List
+- **t** : Tags
+
+**Pour File Shares :**
+- **r** : Read
+- **c** : Create
+- **w** : Write
+- **d** : Delete
+- **l** : List
+
+**Exemples de Permissions CombinÃ©es :**
+
+```bash
+# Lecture seule
+--permissions r
+
+# Lecture et listage
+--permissions rl
+
+# Lecture, Ã©criture, suppression (full control)
+--permissions rwd
+
+# Toutes les permissions
+--permissions rwdlacxtme
+```
+
+**2. Signed Resource (sr) :**
+- **b** : Blob
+- **c** : Container
+- **f** : File
+- **s** : Share (File Share)
+- **d** : Directory (ADLS Gen2)
+- **bs** : Blob Service (Account SAS)
+- **bfs** : Blob File System (ADLS Gen2)
+
+**3. Start Time (st) et Expiry Time (se) :**
+
+```bash
+# Commence maintenant, expire dans 7 jours
+--start "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+--expiry "$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)"
+
+# Commence dans 1 heure, expire dans 24 heures
+--start "$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)" \
+--expiry "$(date -u -d '+1 day' +%Y-%m-%dT%H:%M:%SZ)"
+
+# PowerShell Ã©quivalent
+-StartTime (Get-Date) `
+-ExpiryTime (Get-Date).AddDays(7)
+```
+
+**âš ï¸ Important :** 
+- **Expiry obligatoire** pour tous les SAS
+- **Start time optionnel** (si omis, commence immÃ©diatement)
+- **Clock skew** : Azure accepte jusqu'Ã  15 minutes de diffÃ©rence d'horloge
+
+**4. Signed IP Range (sip) - Restriction par IP :**
+
+```bash
+# Une seule IP
+--ip 203.0.113.5
+
+# Plage d'IPs
+--ip 203.0.113.0-203.0.113.255
+
+# Exemple complet
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --permissions r \
+  --expiry 2024-12-31T23:59:59Z \
+  --ip 203.0.113.5 \
+  --https-only \
+  --auth-mode login \
+  --as-user
+```
+
+**5. Signed Protocol (spr) - Forcer HTTPS :**
+
+```bash
+# HTTPS uniquement (recommandÃ©)
+--https-only
+
+# Ou via paramÃ¨tre
+--protocol https
+
+# PowerShell
+-Protocol HttpsOnly
+```
+
+### Stored Access Policies
+
+**âš ï¸ Concept ClÃ© : Les Stored Access Policies permettent de contrÃ´ler et rÃ©voquer des SAS aprÃ¨s leur Ã©mission**
+
+**DÃ©finition :**
+- **Stored Access Policy** : Politique d'accÃ¨s stockÃ©e sur le container/share/queue/table
+- **Avantage Principal** : PossibilitÃ© de modifier ou rÃ©voquer des SAS sans rÃ©gÃ©nÃ©rer les tokens
+- **Limitation** : Uniquement pour Service SAS (pas Account SAS ni User Delegation SAS)
+
+**Pourquoi Utiliser Stored Access Policies ?**
+
+**Sans Stored Access Policy :**
+```
+âŒ SAS crÃ©Ã© avec expiration 2024-12-31
+âŒ Impossible de rÃ©voquer avant expiration
+âŒ Pour rÃ©voquer : Rotation de la clÃ© du compte (impact global)
+```
+
+**Avec Stored Access Policy :**
+```
+âœ… SAS liÃ© Ã  une policy nommÃ©e
+âœ… Modification de la policy â†’ Impact immÃ©diat sur tous les SAS liÃ©s
+âœ… Suppression de la policy â†’ RÃ©vocation de tous les SAS liÃ©s
+âœ… Pas besoin de rotation de clÃ©
+```
+
+**CrÃ©ation d'une Stored Access Policy :**
+
+```bash
+# Ã‰tape 1 : CrÃ©er une Stored Access Policy sur un container
+az storage container policy create \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name mypolicy \
+  --permissions rl \
+  --start 2024-01-01T00:00:00Z \
+  --expiry 2024-12-31T23:59:59Z
+
+# Ã‰tape 2 : CrÃ©er un SAS liÃ© Ã  la policy
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name myblob.txt \
+  --policy-name mypolicy
+
+# Ã‰tape 3 : Modifier la policy (impact immÃ©diat sur tous les SAS)
+az storage container policy update \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name mypolicy \
+  --permissions r \
+  --expiry 2024-06-30T23:59:59Z
+
+# Ã‰tape 4 : RÃ©voquer tous les SAS liÃ©s Ã  la policy
+az storage container policy delete \
+  --account-name mystorageaccount \
+  --container-name mycontainer \
+  --name mypolicy
+```
+
+**Via PowerShell :**
+
+```powershell
+# Obtenir le contexte
+$ctx = New-AzStorageContext -StorageAccountName "mystorageaccount" -StorageAccountKey "xxxx"
+
+# CrÃ©er Stored Access Policy
+$policy = New-AzStorageContainerStoredAccessPolicy `
+  -Container "mycontainer" `
+  -Policy "mypolicy" `
+  -Permission rl `
+  -StartTime (Get-Date) `
+  -ExpiryTime (Get-Date).AddYears(1) `
+  -Context $ctx
+
+# GÃ©nÃ©rer SAS avec policy
+$sas = New-AzStorageBlobSASToken `
+  -Container "mycontainer" `
+  -Blob "myblob.txt" `
+  -Policy "mypolicy" `
+  -Context $ctx
+
+# RÃ©voquer en supprimant la policy
+Remove-AzStorageContainerStoredAccessPolicy `
+  -Container "mycontainer" `
+  -Policy "mypolicy" `
+  -Context $ctx
+```
+
+**âš ï¸ Limites des Stored Access Policies :**
+
+| Limite | Valeur | Notes |
+|--------|--------|-------|
+| **Policies par container** | 5 | Maximum 5 policies nommÃ©es |
+| **Policies par file share** | 5 | Maximum 5 policies nommÃ©es |
+| **Policies par queue** | 5 | Maximum 5 policies nommÃ©es |
+| **Policies par table** | 5 | Maximum 5 policies nommÃ©es |
+| **Nom de policy** | 64 caractÃ¨res | AlphanumÃ©riques uniquement |
+
+**âš ï¸ ScÃ©narios d'Utilisation - Pour l'Examen :**
+
+**ScÃ©nario 1 : Partage Temporaire avec Client Externe**
+
+```
+ProblÃ¨me :
+- Besoin de partager des fichiers avec un client
+- AccÃ¨s limitÃ© Ã  30 jours
+- Lecture seule
+- PossibilitÃ© de rÃ©voquer si nÃ©cessaire
+
+Solution :
+1. CrÃ©er User Delegation SAS (plus sÃ©curisÃ©)
+2. Permissions : Read (r)
+3. Expiry : +30 jours
+4. IP restriction si possible
+5. HTTPS uniquement
+
+# Commande
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --container-name client-files \
+  --name report-Q4.pdf \
+  --permissions r \
+  --expiry "$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%SZ)" \
+  --https-only \
+  --auth-mode login \
+  --as-user
+
+Avantages :
+âœ… Pas de clÃ© de compte exposÃ©e
+âœ… AccÃ¨s granulaire
+âœ… Expiration automatique
+âœ… RÃ©vocation via Azure AD si besoin
+```
+
+**ScÃ©nario 2 : Upload de Fichiers par Application Tierce**
+
+```
+ProblÃ¨me :
+- Application mobile doit uploader des images
+- Chaque utilisateur doit pouvoir Ã©crire uniquement
+- Pas de lecture des autres fichiers
+- ContrÃ´le par IP du datacenter
+
+Solution :
+1. Service SAS par utilisateur
+2. Permissions : Create, Write (cw)
+3. Expiry : Session utilisateur (2 heures)
+4. IP restriction : Datacenter
+5. Stored Access Policy pour rÃ©vocation
+
+# Commande
+az storage container policy create \
+  --account-name mystorageaccount \
+  --container-name user-uploads \
+  --name upload-policy \
+  --permissions cw \
+  --expiry "$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)"
+
+az storage blob generate-sas \
+  --account-name mystorageaccount \
+  --container-name user-uploads \
+  --name user123/image.jpg \
+  --policy-name upload-policy \
+  --ip 203.0.113.0-203.0.113.255
+
+Avantages :
+âœ… Write-only (sÃ©curitÃ©)
+âœ… RÃ©vocation centralisÃ©e via policy
+âœ… Restriction IP
+âœ… Expiration courte
+```
+
+**ScÃ©nario 3 : Application Multitenant avec Account SAS**
+
+```
+ProblÃ¨me :
+- Application SaaS multi-tenant
+- Besoin d'accÃ¨s Blob ET File Storage
+- DiffÃ©rents tenants avec diffÃ©rentes permissions
+- Audit trail nÃ©cessaire
+
+Solution :
+1. User Delegation SAS si possible (Blob uniquement)
+2. Sinon Account SAS
+3. GÃ©nÃ©rer SAS par tenant avec metadata
+4. Monitoring Azure Monitor
+5. Rotation rÃ©guliÃ¨re des clÃ©s
+
+# Commande (Account SAS pour Blob + File)
+az storage account generate-sas \
+  --account-name mystorageaccount \
+  --services bf \
+  --resource-types sco \
+  --permissions rl \
+  --expiry "$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)" \
+  --https-only
+
+Avantages :
+âœ… Multi-services
+âœ… GranularitÃ© par tenant
+âœ… Rotation possible
+```
+
+**ScÃ©nario 4 : CDN avec SAS pour Contenu PrivÃ©**
+
+```
+ProblÃ¨me :
+- CDN doit servir du contenu privÃ©
+- Utilisateurs authentifiÃ©s uniquement
+- Expiration courte des liens
+
+Solution :
+1. GÃ©nÃ©rer SAS Ã  la demande cÃ´tÃ© serveur
+2. Permissions : Read (r)
+3. Expiry : 15 minutes
+4. Passer SAS Ã  CDN
+5. CDN utilise SAS pour fetch depuis Storage
+
+# Application backend gÃ©nÃ¨re
+$sasToken = New-AzStorageBlobSASToken `
+  -Container "private-content" `
+  -Blob "video-premium.mp4" `
+  -Permission r `
+  -ExpiryTime (Get-Date).AddMinutes(15) `
+  -Context $ctx
+
+# URL finale
+https://cdn.example.com/video-premium.mp4?{$sasToken}
+
+Avantages :
+âœ… Contenu privÃ© sÃ©curisÃ©
+âœ… Expiration courte
+âœ… Performance CDN maintenue
+```
+
+### Best Practices et SÃ©curitÃ©
+
+**âš ï¸ Best Practices pour SAS :**
+
+**1. Choix du Type de SAS**
+- âœ… **Toujours prÃ©fÃ©rer User Delegation SAS** pour Blob Storage
+- âœ… Utiliser Service SAS pour ressources spÃ©cifiques
+- âŒ Ã‰viter Account SAS sauf si multi-services requis
+
+**2. Permissions (Principe du Moindre PrivilÃ¨ge)**
+- âœ… Donner **uniquement** les permissions nÃ©cessaires
+- âœ… PrÃ©fÃ©rer **Read-only** si possible
+- âŒ Ã‰viter permissions "rwdlacx" (trop large)
+- âœ… Utiliser **List** uniquement si nÃ©cessaire
+
+```bash
+# âŒ Mauvais : Trop de permissions
+--permissions rwdlacxtme
+
+# âœ… Bon : Permissions minimales
+--permissions r  # Si lecture seule suffit
+```
+
+**3. Expiration**
+- âœ… Toujours dÃ©finir une **expiration courte** (heures/jours, pas mois/annÃ©es)
+- âœ… RÃ©gÃ©nÃ©rer SAS si besoin d'accÃ¨s prolongÃ©
+- âš ï¸ **15 minutes** : Sessions temporaires (CDN, uploads)
+- âš ï¸ **24 heures** : AccÃ¨s quotidien
+- âš ï¸ **7 jours** : Maximum pour la plupart des cas
+
+```bash
+# âœ… Bon : Expiration courte
+--expiry "$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)"
+
+# âŒ Mauvais : Expiration trop longue
+--expiry "2025-12-31T23:59:59Z"  # Trop loin dans le futur
+```
+
+**4. Restrictions RÃ©seau**
+- âœ… **HTTPS uniquement** : Toujours utiliser `--https-only`
+- âœ… **IP restrictions** : Si IPs connues et fixes
+- âœ… **Private Endpoints** : Si accÃ¨s VNet
+
+```bash
+# âœ… Bon : HTTPS + IP restriction
+az storage blob generate-sas \
+  --permissions r \
+  --https-only \
+  --ip 203.0.113.5
+```
+
+**5. Stored Access Policies**
+- âœ… Utiliser pour **contrÃ´le de rÃ©vocation**
+- âœ… Limite de **5 policies** : Planifier les noms
+- âœ… **Nommage clair** : upload-policy, read-policy-2024
+
+**6. Monitoring et Audit**
+- âœ… Activer **Storage Analytics** pour logs
+- âœ… Monitorer **Azure Monitor metrics** pour anomalies
+- âœ… CrÃ©er **alertes** pour accÃ¨s suspicieux
+
+```bash
+# Activer logging
+az storage logging update \
+  --account-name mystorageaccount \
+  --services b \
+  --log rwd \
+  --retention 90
+```
+
+**7. Rotation des ClÃ©s**
+- âœ… Rotation rÃ©guliÃ¨re (tous les **90 jours**)
+- âœ… Utiliser **key2** pendant rotation de **key1**
+- âœ… Tester avant basculement complet
+
+**âš ï¸ Erreurs Courantes QCM :**
+
+| Question | RÃ©ponse Incorrecte âŒ | RÃ©ponse Correcte âœ… |
+|----------|----------------------|---------------------|
+| **"Quel SAS est le plus sÃ©curisÃ© ?"** | "Account SAS (multi-services)" | "User Delegation SAS (Azure AD)" |
+| **"Peut-on rÃ©voquer un SAS sans Stored Policy ?"** | "Oui, via Azure Portal" | "Non, seulement en rÃ©gÃ©nÃ©rant la clÃ© du compte" |
+| **"User Delegation SAS fonctionne pour Files ?"** | "Oui, tous les services" | "Non, Blob et ADLS Gen2 uniquement" |
+| **"Combien de Stored Policies par container ?"** | "IllimitÃ©" ou "10" | "5 policies maximum" |
+| **"SAS sans expiration est possible ?"** | "Oui, pour Account SAS" | "Non, expiration toujours obligatoire" |
+
+**ProblÃ¨mes Courants et Solutions :**
+
+| ProblÃ¨me | Cause | Solution |
+|----------|-------|----------|
+| **403 Forbidden avec SAS** | SAS expirÃ© ou permissions insuffisantes | VÃ©rifier expiry time et permissions |
+| **SAS ne fonctionne pas** | Clock skew (diffÃ©rence d'horloge) | Utiliser start time -15 minutes |
+| **Impossible de rÃ©voquer SAS** | Pas de Stored Access Policy | CrÃ©er policy ou rÃ©gÃ©nÃ©rer clÃ© compte |
+| **SAS trop long (URL)** | Trop de paramÃ¨tres | Minimaliser permissions et paramÃ¨tres |
+| **Erreur signature invalide** | ClÃ© changÃ©e ou SAS mal formÃ© | RÃ©gÃ©nÃ©rer SAS avec bonne clÃ© |
+
+**Comparaison avec Autres MÃ©thodes d'AccÃ¨s :**
+
+| MÃ©thode | Use Case | Avantages | InconvÃ©nients |
+|---------|----------|-----------|---------------|
+| **Account Key** | Administration | AccÃ¨s complet | âŒ Trop de privilÃ¨ges, pas granulaire |
+| **User Delegation SAS** | Applications modernes | âœ… SÃ©curisÃ©, Azure AD | Blob/ADLS uniquement |
+| **Service SAS** | AccÃ¨s dÃ©lÃ©guÃ© | âœ… Granulaire, contrÃ´lÃ© | NÃ©cessite clÃ© compte |
+| **Account SAS** | Multi-services legacy | âœ… Multi-services | âŒ Moins sÃ©curisÃ© |
+| **Azure AD (RBAC)** | IdentitÃ©s permanentes | âœ… Gestion centralisÃ©e | Pas pour accÃ¨s anonyme |
+| **Anonymous Public Access** | Contenu public | âœ… Simple | âŒ Pas sÃ©curisÃ© |
+
+**âš ï¸ Points ClÃ©s pour l'Examen :**
+- âœ… **3 types de SAS** : User Delegation (recommandÃ©), Service, Account
+- âœ… **User Delegation SAS** = Plus sÃ©curisÃ© (Azure AD, pas de clÃ©s)
+- âœ… **Stored Access Policy** = Permet rÃ©vocation des SAS
+- âœ… **5 policies max** par container/share/queue/table
+- âœ… **Expiration obligatoire** pour tous les SAS
+- âœ… **HTTPS uniquement** = Best practice
+- âœ… **Permissions minimales** = Principe du moindre privilÃ¨ge
+- âœ… **sp=r** : Read, **sp=w** : Write, **sp=d** : Delete, **sp=l** : List
+- âœ… **RÃ©vocation** : Supprimer Stored Policy OU rÃ©gÃ©nÃ©rer clÃ© compte
+- âœ… **IP restriction** possible avec paramÃ¨tre `--ip`
+
