@@ -2942,12 +2942,12 @@ other::---             # Autres n'ont aucun droit
 
 ## 2.6 Shared Access Signatures (SAS)
 
-**âš ï¸ Concept ClÃ© pour AZ-104 : Les Shared Access Signatures (SAS) fournissent un accÃ¨s dÃ©lÃ©guÃ© sÃ©curisÃ© aux ressources de stockage Azure sans partager les clÃ©s du compte**
+**âš ï¸ Concept Clé pour AZ-104 : Les Shared Access Signatures (SAS) fournissent un accès délégué sécurisé aux ressources de stockage Azure sans partager les clés du compte**
 
-**DÃ©finition :**
-- **Shared Access Signature (SAS)** : URI qui accorde des droits d'accÃ¨s restreints aux ressources Azure Storage
-- **Objectif** : DÃ©lÃ©gation d'accÃ¨s granulaire avec contrÃ´le prÃ©cis des permissions et de la durÃ©e
-- **Avantage Principal** : Partage sÃ©curisÃ© sans exposer les clÃ©s du compte de stockage
+**Définition :**
+- **Shared Access Signature (SAS)** : URI qui accorde des droits d'accès restreints aux ressources Azure Storage
+- **Objectif** : Délégation d'accès granulaire avec contrôle précis des permissions et de la durée
+- **Avantage Principal** : Partage sécurisé sans exposer les clés du compte de stockage
 
 **Principe de Fonctionnement :**
 
@@ -2958,21 +2958,21 @@ other::---             # Autres n'ont aucun droit
 â”‚  â”‚       Account Key (Ne JAMAIS partager)    â”‚     â”‚
 â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â”‚
 â”‚                   â”‚                                 â”‚
-â”‚                   â–¼ Signe le SAS Token              â”‚
+â”‚                   ▼ Signe le SAS Token              â”‚
 â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”‚
-â”‚  â”‚      SAS Token GÃ©nÃ©rÃ©                     â”‚     â”‚
+â”‚  â”‚      SAS Token Généré                     â”‚     â”‚
 â”‚  â”‚  ?sv=2021-06-08&ss=b&srt=sco&sp=rwdlacx  â”‚     â”‚
 â”‚  â”‚  &se=2024-12-31T23:59:59Z&st=...&sig=... â”‚     â”‚
 â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â”‚
 â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
                     â”‚
-                    â–¼ PartagÃ© avec
+                    ▼ Partagé avec
          â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
          â”‚   Application Tierce  â”‚
          â”‚   ou Utilisateur      â”‚
          â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
                     â”‚
-                    â–¼ AccÃ¨s limitÃ© aux ressources
+                    ▼ Accès limité aux ressources
          â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
          â”‚   Blob / Container    â”‚
          â”‚   (lecture seule, etc)â”‚
@@ -2981,26 +2981,26 @@ other::---             # Autres n'ont aucun droit
 
 ### Types de SAS
 
-**âš ï¸ Il existe 3 types principaux de SAS - Chacun avec des use cases spÃ©cifiques**
+**âš ï¸ Il existe 3 types principaux de SAS - Chacun avec des use cases spécifiques**
 
-**1. User Delegation SAS (RecommandÃ© - Plus SÃ©curisÃ©)**
+**1. User Delegation SAS (Recommandé - Plus Sécurisé)**
 
-**CaractÃ©ristiques :**
-- **Authentification** : BasÃ©e sur Azure AD credentials (OAuth 2.0)
+**Caractéristiques :**
+- **Authentification** : Basée sur Azure AD credentials (OAuth 2.0)
 - **Signature** : Utilise une User Delegation Key obtenue d'Azure AD
-- **Avantage** : NE nÃ©cessite PAS les clÃ©s du compte de stockage
+- **Avantage** : NE nécessite PAS les clés du compte de stockage
 - **Scope** : Blob Storage et Data Lake Storage Gen2 uniquement
-- **SÃ©curitÃ©** : Meilleure pratique recommandÃ©e par Microsoft
+- **Sécurité** : Meilleure pratique recommandée par Microsoft
 
-**CrÃ©ation - User Delegation SAS :**
+**Création - User Delegation SAS :**
 
 ```bash
-# PrÃ©requis : Utilisateur doit avoir le rÃ´le "Storage Blob Data Contributor" ou supÃ©rieur
+# Prérequis : Utilisateur doit avoir le rôle "Storage Blob Data Contributor" ou supérieur
 
-# Ã‰tape 1 : Se connecter avec Azure AD
+# Étape 1 : Se connecter avec Azure AD
 az login
 
-# Ã‰tape 2 : GÃ©nÃ©rer User Delegation SAS
+# Étape 2 : Générer User Delegation SAS
 az storage blob generate-sas \
   --account-name mystorageaccount \
   --container-name mycontainer \
@@ -3013,7 +3013,7 @@ az storage blob generate-sas \
 # Output : SAS Token
 # ?sv=2021-06-08&st=2024-01-01T00:00:00Z&se=2024-12-31T23:59:59Z&sr=b&sp=r&sig=...
 
-# Construire URL complÃ¨te
+# Construire URL complète
 https://mystorageaccount.blob.core.windows.net/mycontainer/myblob.txt?sv=2021-06-08&st=...&sig=...
 ```
 
@@ -3026,7 +3026,7 @@ Connect-AzAccount
 # Obtenir le contexte du Storage Account
 $ctx = New-AzStorageContext -StorageAccountName "mystorageaccount" -UseConnectedAccount
 
-# GÃ©nÃ©rer User Delegation SAS pour un blob
+# Générer User Delegation SAS pour un blob
 $sasToken = New-AzStorageBlobSASToken `
   -Context $ctx `
   -Container "mycontainer" `
@@ -3034,30 +3034,30 @@ $sasToken = New-AzStorageBlobSASToken `
   -Permission r `
   -ExpiryTime (Get-Date).AddDays(7)
 
-# URL complÃ¨te
+# URL complète
 $blobUri = $ctx.BlobEndPoint + "mycontainer/myblob.txt" + $sasToken
 Write-Output $blobUri
 ```
 
 **âš ï¸ Avantages User Delegation SAS :**
-- âœ… **Pas de clÃ©s exposÃ©es** : N'utilise pas les clÃ©s du compte
-- âœ… **Azure AD integration** : RÃ©vocation via Azure AD
-- âœ… **Audit trail** : TraÃ§abilitÃ© complÃ¨te dans Azure AD logs
-- âœ… **Rotation automatique** : User Delegation Key rotÃ©e automatiquement
-- âœ… **Least privilege** : BasÃ© sur RBAC Azure AD
+- ✅ **Pas de clés exposées** : N'utilise pas les clés du compte
+- ✅ **Azure AD integration** : Révocation via Azure AD
+- ✅ **Audit trail** : Traçabilité complète dans Azure AD logs
+- ✅ **Rotation automatique** : User Delegation Key rotée automatiquement
+- ✅ **Least privilege** : Basé sur RBAC Azure AD
 
 **2. Service SAS**
 
-**CaractÃ©ristiques :**
-- **Authentification** : SignÃ©e avec la clÃ© du compte de stockage
-- **Scope** : Ressource spÃ©cifique dans UN seul service (Blob, Queue, Table, File)
-- **GranularitÃ©** : AccÃ¨s Ã  un blob, container, file share, queue, ou table
-- **Use Case** : DÃ©lÃ©gation d'accÃ¨s Ã  des ressources spÃ©cifiques
+**Caractéristiques :**
+- **Authentification** : Signée avec la clé du compte de stockage
+- **Scope** : Ressource spécifique dans UN seul service (Blob, Queue, Table, File)
+- **Granularité** : Accès Ã  un blob, container, file share, queue, ou table
+- **Use Case** : Délégation d'accès Ã  des ressources spécifiques
 
-**CrÃ©ation - Service SAS :**
+**Création - Service SAS :**
 
 ```bash
-# Service SAS pour un blob spÃ©cifique
+# Service SAS pour un blob spécifique
 az storage blob generate-sas \
   --account-name mystorageaccount \
   --account-key "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
@@ -3087,7 +3087,7 @@ az storage share generate-sas \
 **Via PowerShell :**
 
 ```powershell
-# Obtenir le contexte avec la clÃ© du compte
+# Obtenir le contexte avec la clé du compte
 $ctx = New-AzStorageContext -StorageAccountName "mystorageaccount" -StorageAccountKey "xxxx"
 
 # Service SAS pour blob
@@ -3109,16 +3109,16 @@ $containerSAS = New-AzStorageContainerSASToken `
 
 **3. Account SAS**
 
-**CaractÃ©ristiques :**
-- **Authentification** : SignÃ©e avec la clÃ© du compte de stockage
-- **Scope** : AccÃ¨s Ã  PLUSIEURS services (Blob, Queue, Table, File)
-- **GranularitÃ©** : OpÃ©rations au niveau du service ET de la ressource
-- **Use Case** : Applications nÃ©cessitant accÃ¨s multi-services
+**Caractéristiques :**
+- **Authentification** : Signée avec la clé du compte de stockage
+- **Scope** : Accès Ã  PLUSIEURS services (Blob, Queue, Table, File)
+- **Granularité** : Opérations au niveau du service ET de la ressource
+- **Use Case** : Applications nécessitant accès multi-services
 
-**CrÃ©ation - Account SAS :**
+**Création - Account SAS :**
 
 ```bash
-# Account SAS donnant accÃ¨s Ã  Blob et File Services
+# Account SAS donnant accès Ã  Blob et File Services
 az storage account generate-sas \
   --account-name mystorageaccount \
   --account-key "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
@@ -3128,7 +3128,7 @@ az storage account generate-sas \
   --expiry 2024-12-31T23:59:59Z \
   --https-only
 
-# ParamÃ¨tres :
+# Paramètres :
 # --services : b=Blob, f=File, q=Queue, t=Table
 # --resource-types : s=Service, c=Container, o=Object
 ```
@@ -3136,7 +3136,7 @@ az storage account generate-sas \
 **Via PowerShell :**
 
 ```powershell
-# Account SAS avec accÃ¨s multi-services
+# Account SAS avec accès multi-services
 $accountSAS = New-AzStorageAccountSASToken `
   -Service Blob,File `
   -ResourceType Service,Container,Object `
@@ -3150,15 +3150,15 @@ Write-Output "Account SAS: $accountSAS"
 
 **âš ï¸ Comparaison des 3 Types de SAS :**
 
-| CritÃ¨re | User Delegation SAS | Service SAS | Account SAS |
+| Critère | User Delegation SAS | Service SAS | Account SAS |
 |---------|---------------------|-------------|-------------|
 | **Authentification** | Azure AD (OAuth) | Account Key | Account Key |
-| **SÃ©curitÃ©** | âœ… Meilleure | âŒ ClÃ© exposÃ©e | âŒ ClÃ© exposÃ©e |
+| **Sécurité** | ✅ Meilleure | âŒ Clé exposée | âŒ Clé exposée |
 | **Scope Services** | Blob, ADLS Gen2 | 1 service | Plusieurs services |
-| **RÃ©vocation** | âœ… Via Azure AD | âŒ Rotation clÃ© uniquement | âŒ Rotation clÃ© uniquement |
-| **Audit** | âœ… Azure AD logs | âš ï¸ Storage logs | âš ï¸ Storage logs |
-| **Use Case** | Applications modernes | AccÃ¨s ressource unique | Multi-services legacy |
-| **Recommandation** | âœ… PrÃ©fÃ©rÃ© | âš ï¸ Si User Delegation impossible | âŒ Ã‰viter si possible |
+| **Révocation** | ✅ Via Azure AD | âŒ Rotation clé uniquement | âŒ Rotation clé uniquement |
+| **Audit** | ✅ Azure AD logs | âš ï¸ Storage logs | âš ï¸ Storage logs |
+| **Use Case** | Applications modernes | Accès ressource unique | Multi-services legacy |
+| **Recommandation** | ✅ Préféré | âš ï¸ Si User Delegation impossible | âŒ Éviter si possible |
 
 ### SAS Tokens et Permissions
 
@@ -3176,22 +3176,22 @@ https://mystorageaccount.blob.core.windows.net/mycontainer/myblob.txt
 &sig=xxxxxxxxxxxxxx      # Signature (HMAC-SHA256)
 ```
 
-**ParamÃ¨tres ClÃ©s :**
+**Paramètres Clés :**
 
 **1. Signed Permissions (sp) :**
 
 **Pour Blobs :**
-- **r** : Read (lire contenu, propriÃ©tÃ©s, mÃ©tadonnÃ©es)
+- **r** : Read (lire contenu, propriétés, métadonnées)
 - **a** : Add (ajouter des blocks Ã  un append blob)
-- **c** : Create (crÃ©er ou upload un blob)
-- **w** : Write (Ã©crire ou upload - Ã©crase le blob existant)
+- **c** : Create (créer ou upload un blob)
+- **w** : Write (écrire ou upload - écrase le blob existant)
 - **d** : Delete (supprimer le blob)
 - **x** : Delete Version (supprimer une version de blob)
 - **y** : Permanent Delete (suppression permanente - soft delete)
 - **l** : List (lister les blobs dans un container)
-- **t** : Tags (lire/Ã©crire blob tags)
+- **t** : Tags (lire/écrire blob tags)
 - **m** : Move (rename blob - ADLS Gen2)
-- **e** : Execute (ADLS Gen2 - exÃ©cution rÃ©pertoire)
+- **e** : Execute (ADLS Gen2 - exécution répertoire)
 
 **Pour Containers :**
 - **r** : Read
@@ -3209,7 +3209,7 @@ https://mystorageaccount.blob.core.windows.net/mycontainer/myblob.txt
 - **d** : Delete
 - **l** : List
 
-**Exemples de Permissions CombinÃ©es :**
+**Exemples de Permissions Combinées :**
 
 ```bash
 # Lecture seule
@@ -3218,7 +3218,7 @@ https://mystorageaccount.blob.core.windows.net/mycontainer/myblob.txt
 # Lecture et listage
 --permissions rl
 
-# Lecture, Ã©criture, suppression (full control)
+# Lecture, écriture, suppression (full control)
 --permissions rwd
 
 # Toutes les permissions
@@ -3245,15 +3245,15 @@ https://mystorageaccount.blob.core.windows.net/mycontainer/myblob.txt
 --start "$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)" \
 --expiry "$(date -u -d '+1 day' +%Y-%m-%dT%H:%M:%SZ)"
 
-# PowerShell Ã©quivalent
+# PowerShell équivalent
 -StartTime (Get-Date) `
 -ExpiryTime (Get-Date).AddDays(7)
 ```
 
 **âš ï¸ Important :** 
 - **Expiry obligatoire** pour tous les SAS
-- **Start time optionnel** (si omis, commence immÃ©diatement)
-- **Clock skew** : Azure accepte jusqu'Ã  15 minutes de diffÃ©rence d'horloge
+- **Start time optionnel** (si omis, commence immédiatement)
+- **Clock skew** : Azure accepte jusqu'Ã  15 minutes de différence d'horloge
 
 **4. Signed IP Range (sip) - Restriction par IP :**
 
@@ -3280,10 +3280,10 @@ az storage blob generate-sas \
 **5. Signed Protocol (spr) - Forcer HTTPS :**
 
 ```bash
-# HTTPS uniquement (recommandÃ©)
+# HTTPS uniquement (recommandé)
 --https-only
 
-# Ou via paramÃ¨tre
+# Ou via paramètre
 --protocol https
 
 # PowerShell
@@ -3292,34 +3292,34 @@ az storage blob generate-sas \
 
 ### Stored Access Policies
 
-**âš ï¸ Concept ClÃ© : Les Stored Access Policies permettent de contrÃ´ler et rÃ©voquer des SAS aprÃ¨s leur Ã©mission**
+**âš ï¸ Concept Clé : Les Stored Access Policies permettent de contrôler et révoquer des SAS après leur émission**
 
-**DÃ©finition :**
-- **Stored Access Policy** : Politique d'accÃ¨s stockÃ©e sur le container/share/queue/table
-- **Avantage Principal** : PossibilitÃ© de modifier ou rÃ©voquer des SAS sans rÃ©gÃ©nÃ©rer les tokens
+**Définition :**
+- **Stored Access Policy** : Politique d'accès stockée sur le container/share/queue/table
+- **Avantage Principal** : Possibilité de modifier ou révoquer des SAS sans régénérer les tokens
 - **Limitation** : Uniquement pour Service SAS (pas Account SAS ni User Delegation SAS)
 
 **Pourquoi Utiliser Stored Access Policies ?**
 
 **Sans Stored Access Policy :**
 ```
-âŒ SAS crÃ©Ã© avec expiration 2024-12-31
-âŒ Impossible de rÃ©voquer avant expiration
-âŒ Pour rÃ©voquer : Rotation de la clÃ© du compte (impact global)
+âŒ SAS créé avec expiration 2024-12-31
+âŒ Impossible de révoquer avant expiration
+âŒ Pour révoquer : Rotation de la clé du compte (impact global)
 ```
 
 **Avec Stored Access Policy :**
 ```
-âœ… SAS liÃ© Ã  une policy nommÃ©e
-âœ… Modification de la policy â†’ Impact immÃ©diat sur tous les SAS liÃ©s
-âœ… Suppression de la policy â†’ RÃ©vocation de tous les SAS liÃ©s
-âœ… Pas besoin de rotation de clÃ©
+✅ SAS lié Ã  une policy nommée
+✅ Modification de la policy â†’ Impact immédiat sur tous les SAS liés
+✅ Suppression de la policy â†’ Révocation de tous les SAS liés
+✅ Pas besoin de rotation de clé
 ```
 
-**CrÃ©ation d'une Stored Access Policy :**
+**Création d'une Stored Access Policy :**
 
 ```bash
-# Ã‰tape 1 : CrÃ©er une Stored Access Policy sur un container
+# Étape 1 : Créer une Stored Access Policy sur un container
 az storage container policy create \
   --account-name mystorageaccount \
   --container-name mycontainer \
@@ -3328,14 +3328,14 @@ az storage container policy create \
   --start 2024-01-01T00:00:00Z \
   --expiry 2024-12-31T23:59:59Z
 
-# Ã‰tape 2 : CrÃ©er un SAS liÃ© Ã  la policy
+# Étape 2 : Créer un SAS lié Ã  la policy
 az storage blob generate-sas \
   --account-name mystorageaccount \
   --container-name mycontainer \
   --name myblob.txt \
   --policy-name mypolicy
 
-# Ã‰tape 3 : Modifier la policy (impact immÃ©diat sur tous les SAS)
+# Étape 3 : Modifier la policy (impact immédiat sur tous les SAS)
 az storage container policy update \
   --account-name mystorageaccount \
   --container-name mycontainer \
@@ -3343,7 +3343,7 @@ az storage container policy update \
   --permissions r \
   --expiry 2024-06-30T23:59:59Z
 
-# Ã‰tape 4 : RÃ©voquer tous les SAS liÃ©s Ã  la policy
+# Étape 4 : Révoquer tous les SAS liés Ã  la policy
 az storage container policy delete \
   --account-name mystorageaccount \
   --container-name mycontainer \
@@ -3356,7 +3356,7 @@ az storage container policy delete \
 # Obtenir le contexte
 $ctx = New-AzStorageContext -StorageAccountName "mystorageaccount" -StorageAccountKey "xxxx"
 
-# CrÃ©er Stored Access Policy
+# Créer Stored Access Policy
 $policy = New-AzStorageContainerStoredAccessPolicy `
   -Container "mycontainer" `
   -Policy "mypolicy" `
@@ -3365,14 +3365,14 @@ $policy = New-AzStorageContainerStoredAccessPolicy `
   -ExpiryTime (Get-Date).AddYears(1) `
   -Context $ctx
 
-# GÃ©nÃ©rer SAS avec policy
+# Générer SAS avec policy
 $sas = New-AzStorageBlobSASToken `
   -Container "mycontainer" `
   -Blob "myblob.txt" `
   -Policy "mypolicy" `
   -Context $ctx
 
-# RÃ©voquer en supprimant la policy
+# Révoquer en supprimant la policy
 Remove-AzStorageContainerStoredAccessPolicy `
   -Container "mycontainer" `
   -Policy "mypolicy" `
@@ -3383,25 +3383,25 @@ Remove-AzStorageContainerStoredAccessPolicy `
 
 | Limite | Valeur | Notes |
 |--------|--------|-------|
-| **Policies par container** | 5 | Maximum 5 policies nommÃ©es |
-| **Policies par file share** | 5 | Maximum 5 policies nommÃ©es |
-| **Policies par queue** | 5 | Maximum 5 policies nommÃ©es |
-| **Policies par table** | 5 | Maximum 5 policies nommÃ©es |
-| **Nom de policy** | 64 caractÃ¨res | AlphanumÃ©riques uniquement |
+| **Policies par container** | 5 | Maximum 5 policies nommées |
+| **Policies par file share** | 5 | Maximum 5 policies nommées |
+| **Policies par queue** | 5 | Maximum 5 policies nommées |
+| **Policies par table** | 5 | Maximum 5 policies nommées |
+| **Nom de policy** | 64 caractères | Alphanumériques uniquement |
 
-**âš ï¸ ScÃ©narios d'Utilisation - Pour l'Examen :**
+**âš ï¸ Scénarios d'Utilisation - Pour l'Examen :**
 
-**ScÃ©nario 1 : Partage Temporaire avec Client Externe**
+**Scénario 1 : Partage Temporaire avec Client Externe**
 
 ```
-ProblÃ¨me :
+Problème :
 - Besoin de partager des fichiers avec un client
-- AccÃ¨s limitÃ© Ã  30 jours
+- Accès limité Ã  30 jours
 - Lecture seule
-- PossibilitÃ© de rÃ©voquer si nÃ©cessaire
+- Possibilité de révoquer si nécessaire
 
 Solution :
-1. CrÃ©er User Delegation SAS (plus sÃ©curisÃ©)
+1. Créer User Delegation SAS (plus sécurisé)
 2. Permissions : Read (r)
 3. Expiry : +30 jours
 4. IP restriction si possible
@@ -3419,27 +3419,27 @@ az storage blob generate-sas \
   --as-user
 
 Avantages :
-âœ… Pas de clÃ© de compte exposÃ©e
-âœ… AccÃ¨s granulaire
-âœ… Expiration automatique
-âœ… RÃ©vocation via Azure AD si besoin
+✅ Pas de clé de compte exposée
+✅ Accès granulaire
+✅ Expiration automatique
+✅ Révocation via Azure AD si besoin
 ```
 
-**ScÃ©nario 2 : Upload de Fichiers par Application Tierce**
+**Scénario 2 : Upload de Fichiers par Application Tierce**
 
 ```
-ProblÃ¨me :
+Problème :
 - Application mobile doit uploader des images
-- Chaque utilisateur doit pouvoir Ã©crire uniquement
+- Chaque utilisateur doit pouvoir écrire uniquement
 - Pas de lecture des autres fichiers
-- ContrÃ´le par IP du datacenter
+- Contrôle par IP du datacenter
 
 Solution :
 1. Service SAS par utilisateur
 2. Permissions : Create, Write (cw)
 3. Expiry : Session utilisateur (2 heures)
 4. IP restriction : Datacenter
-5. Stored Access Policy pour rÃ©vocation
+5. Stored Access Policy pour révocation
 
 # Commande
 az storage container policy create \
@@ -3457,27 +3457,27 @@ az storage blob generate-sas \
   --ip 203.0.113.0-203.0.113.255
 
 Avantages :
-âœ… Write-only (sÃ©curitÃ©)
-âœ… RÃ©vocation centralisÃ©e via policy
-âœ… Restriction IP
-âœ… Expiration courte
+✅ Write-only (sécurité)
+✅ Révocation centralisée via policy
+✅ Restriction IP
+✅ Expiration courte
 ```
 
-**ScÃ©nario 3 : Application Multitenant avec Account SAS**
+**Scénario 3 : Application Multitenant avec Account SAS**
 
 ```
-ProblÃ¨me :
+Problème :
 - Application SaaS multi-tenant
-- Besoin d'accÃ¨s Blob ET File Storage
-- DiffÃ©rents tenants avec diffÃ©rentes permissions
-- Audit trail nÃ©cessaire
+- Besoin d'accès Blob ET File Storage
+- Différents tenants avec différentes permissions
+- Audit trail nécessaire
 
 Solution :
 1. User Delegation SAS si possible (Blob uniquement)
 2. Sinon Account SAS
-3. GÃ©nÃ©rer SAS par tenant avec metadata
+3. Générer SAS par tenant avec metadata
 4. Monitoring Azure Monitor
-5. Rotation rÃ©guliÃ¨re des clÃ©s
+5. Rotation régulière des clés
 
 # Commande (Account SAS pour Blob + File)
 az storage account generate-sas \
@@ -3489,27 +3489,27 @@ az storage account generate-sas \
   --https-only
 
 Avantages :
-âœ… Multi-services
-âœ… GranularitÃ© par tenant
-âœ… Rotation possible
+✅ Multi-services
+✅ Granularité par tenant
+✅ Rotation possible
 ```
 
-**ScÃ©nario 4 : CDN avec SAS pour Contenu PrivÃ©**
+**Scénario 4 : CDN avec SAS pour Contenu Privé**
 
 ```
-ProblÃ¨me :
-- CDN doit servir du contenu privÃ©
-- Utilisateurs authentifiÃ©s uniquement
+Problème :
+- CDN doit servir du contenu privé
+- Utilisateurs authentifiés uniquement
 - Expiration courte des liens
 
 Solution :
-1. GÃ©nÃ©rer SAS Ã  la demande cÃ´tÃ© serveur
+1. Générer SAS Ã  la demande côté serveur
 2. Permissions : Read (r)
 3. Expiry : 15 minutes
 4. Passer SAS Ã  CDN
 5. CDN utilise SAS pour fetch depuis Storage
 
-# Application backend gÃ©nÃ¨re
+# Application backend génère
 $sasToken = New-AzStorageBlobSASToken `
   -Container "private-content" `
   -Blob "video-premium.mp4" `
@@ -3521,56 +3521,56 @@ $sasToken = New-AzStorageBlobSASToken `
 https://cdn.example.com/video-premium.mp4?{$sasToken}
 
 Avantages :
-âœ… Contenu privÃ© sÃ©curisÃ©
-âœ… Expiration courte
-âœ… Performance CDN maintenue
+✅ Contenu privé sécurisé
+✅ Expiration courte
+✅ Performance CDN maintenue
 ```
 
-### Best Practices et SÃ©curitÃ©
+### Best Practices et Sécurité
 
 **âš ï¸ Best Practices pour SAS :**
 
 **1. Choix du Type de SAS**
-- âœ… **Toujours prÃ©fÃ©rer User Delegation SAS** pour Blob Storage
-- âœ… Utiliser Service SAS pour ressources spÃ©cifiques
-- âŒ Ã‰viter Account SAS sauf si multi-services requis
+- ✅ **Toujours préférer User Delegation SAS** pour Blob Storage
+- ✅ Utiliser Service SAS pour ressources spécifiques
+- âŒ Éviter Account SAS sauf si multi-services requis
 
-**2. Permissions (Principe du Moindre PrivilÃ¨ge)**
-- âœ… Donner **uniquement** les permissions nÃ©cessaires
-- âœ… PrÃ©fÃ©rer **Read-only** si possible
-- âŒ Ã‰viter permissions "rwdlacx" (trop large)
-- âœ… Utiliser **List** uniquement si nÃ©cessaire
+**2. Permissions (Principe du Moindre Privilège)**
+- ✅ Donner **uniquement** les permissions nécessaires
+- ✅ Préférer **Read-only** si possible
+- âŒ Éviter permissions "rwdlacx" (trop large)
+- ✅ Utiliser **List** uniquement si nécessaire
 
 ```bash
 # âŒ Mauvais : Trop de permissions
 --permissions rwdlacxtme
 
-# âœ… Bon : Permissions minimales
+# ✅ Bon : Permissions minimales
 --permissions r  # Si lecture seule suffit
 ```
 
 **3. Expiration**
-- âœ… Toujours dÃ©finir une **expiration courte** (heures/jours, pas mois/annÃ©es)
-- âœ… RÃ©gÃ©nÃ©rer SAS si besoin d'accÃ¨s prolongÃ©
+- ✅ Toujours définir une **expiration courte** (heures/jours, pas mois/années)
+- ✅ Régénérer SAS si besoin d'accès prolongé
 - âš ï¸ **15 minutes** : Sessions temporaires (CDN, uploads)
-- âš ï¸ **24 heures** : AccÃ¨s quotidien
+- âš ï¸ **24 heures** : Accès quotidien
 - âš ï¸ **7 jours** : Maximum pour la plupart des cas
 
 ```bash
-# âœ… Bon : Expiration courte
+# ✅ Bon : Expiration courte
 --expiry "$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)"
 
 # âŒ Mauvais : Expiration trop longue
 --expiry "2025-12-31T23:59:59Z"  # Trop loin dans le futur
 ```
 
-**4. Restrictions RÃ©seau**
-- âœ… **HTTPS uniquement** : Toujours utiliser `--https-only`
-- âœ… **IP restrictions** : Si IPs connues et fixes
-- âœ… **Private Endpoints** : Si accÃ¨s VNet
+**4. Restrictions Réseau**
+- ✅ **HTTPS uniquement** : Toujours utiliser `--https-only`
+- ✅ **IP restrictions** : Si IPs connues et fixes
+- ✅ **Private Endpoints** : Si accès VNet
 
 ```bash
-# âœ… Bon : HTTPS + IP restriction
+# ✅ Bon : HTTPS + IP restriction
 az storage blob generate-sas \
   --permissions r \
   --https-only \
@@ -3578,14 +3578,14 @@ az storage blob generate-sas \
 ```
 
 **5. Stored Access Policies**
-- âœ… Utiliser pour **contrÃ´le de rÃ©vocation**
-- âœ… Limite de **5 policies** : Planifier les noms
-- âœ… **Nommage clair** : upload-policy, read-policy-2024
+- ✅ Utiliser pour **contrôle de révocation**
+- ✅ Limite de **5 policies** : Planifier les noms
+- ✅ **Nommage clair** : upload-policy, read-policy-2024
 
 **6. Monitoring et Audit**
-- âœ… Activer **Storage Analytics** pour logs
-- âœ… Monitorer **Azure Monitor metrics** pour anomalies
-- âœ… CrÃ©er **alertes** pour accÃ¨s suspicieux
+- ✅ Activer **Storage Analytics** pour logs
+- ✅ Monitorer **Azure Monitor metrics** pour anomalies
+- ✅ Créer **alertes** pour accès suspicieux
 
 ```bash
 # Activer logging
@@ -3596,51 +3596,50 @@ az storage logging update \
   --retention 90
 ```
 
-**7. Rotation des ClÃ©s**
-- âœ… Rotation rÃ©guliÃ¨re (tous les **90 jours**)
-- âœ… Utiliser **key2** pendant rotation de **key1**
-- âœ… Tester avant basculement complet
+**7. Rotation des Clés**
+- ✅ Rotation régulière (tous les **90 jours**)
+- ✅ Utiliser **key2** pendant rotation de **key1**
+- ✅ Tester avant basculement complet
 
 **âš ï¸ Erreurs Courantes QCM :**
 
-| Question | RÃ©ponse Incorrecte âŒ | RÃ©ponse Correcte âœ… |
+| Question | Réponse Incorrecte âŒ | Réponse Correcte ✅ |
 |----------|----------------------|---------------------|
-| **"Quel SAS est le plus sÃ©curisÃ© ?"** | "Account SAS (multi-services)" | "User Delegation SAS (Azure AD)" |
-| **"Peut-on rÃ©voquer un SAS sans Stored Policy ?"** | "Oui, via Azure Portal" | "Non, seulement en rÃ©gÃ©nÃ©rant la clÃ© du compte" |
+| **"Quel SAS est le plus sécurisé ?"** | "Account SAS (multi-services)" | "User Delegation SAS (Azure AD)" |
+| **"Peut-on révoquer un SAS sans Stored Policy ?"** | "Oui, via Azure Portal" | "Non, seulement en régénérant la clé du compte" |
 | **"User Delegation SAS fonctionne pour Files ?"** | "Oui, tous les services" | "Non, Blob et ADLS Gen2 uniquement" |
-| **"Combien de Stored Policies par container ?"** | "IllimitÃ©" ou "10" | "5 policies maximum" |
+| **"Combien de Stored Policies par container ?"** | "Illimité" ou "10" | "5 policies maximum" |
 | **"SAS sans expiration est possible ?"** | "Oui, pour Account SAS" | "Non, expiration toujours obligatoire" |
 
-**ProblÃ¨mes Courants et Solutions :**
+**Problèmes Courants et Solutions :**
 
-| ProblÃ¨me | Cause | Solution |
+| Problème | Cause | Solution |
 |----------|-------|----------|
-| **403 Forbidden avec SAS** | SAS expirÃ© ou permissions insuffisantes | VÃ©rifier expiry time et permissions |
-| **SAS ne fonctionne pas** | Clock skew (diffÃ©rence d'horloge) | Utiliser start time -15 minutes |
-| **Impossible de rÃ©voquer SAS** | Pas de Stored Access Policy | CrÃ©er policy ou rÃ©gÃ©nÃ©rer clÃ© compte |
-| **SAS trop long (URL)** | Trop de paramÃ¨tres | Minimaliser permissions et paramÃ¨tres |
-| **Erreur signature invalide** | ClÃ© changÃ©e ou SAS mal formÃ© | RÃ©gÃ©nÃ©rer SAS avec bonne clÃ© |
+| **403 Forbidden avec SAS** | SAS expiré ou permissions insuffisantes | Vérifier expiry time et permissions |
+| **SAS ne fonctionne pas** | Clock skew (différence d'horloge) | Utiliser start time -15 minutes |
+| **Impossible de révoquer SAS** | Pas de Stored Access Policy | Créer policy ou régénérer clé compte |
+| **SAS trop long (URL)** | Trop de paramètres | Minimaliser permissions et paramètres |
+| **Erreur signature invalide** | Clé changée ou SAS mal formé | Régénérer SAS avec bonne clé |
 
-**Comparaison avec Autres MÃ©thodes d'AccÃ¨s :**
+**Comparaison avec Autres Méthodes d'Accès :**
 
-| MÃ©thode | Use Case | Avantages | InconvÃ©nients |
+| Méthode | Use Case | Avantages | Inconvénients |
 |---------|----------|-----------|---------------|
-| **Account Key** | Administration | AccÃ¨s complet | âŒ Trop de privilÃ¨ges, pas granulaire |
-| **User Delegation SAS** | Applications modernes | âœ… SÃ©curisÃ©, Azure AD | Blob/ADLS uniquement |
-| **Service SAS** | AccÃ¨s dÃ©lÃ©guÃ© | âœ… Granulaire, contrÃ´lÃ© | NÃ©cessite clÃ© compte |
-| **Account SAS** | Multi-services legacy | âœ… Multi-services | âŒ Moins sÃ©curisÃ© |
-| **Azure AD (RBAC)** | IdentitÃ©s permanentes | âœ… Gestion centralisÃ©e | Pas pour accÃ¨s anonyme |
-| **Anonymous Public Access** | Contenu public | âœ… Simple | âŒ Pas sÃ©curisÃ© |
+| **Account Key** | Administration | Accès complet | âŒ Trop de privilèges, pas granulaire |
+| **User Delegation SAS** | Applications modernes | ✅ Sécurisé, Azure AD | Blob/ADLS uniquement |
+| **Service SAS** | Accès délégué | ✅ Granulaire, contrôlé | Nécessite clé compte |
+| **Account SAS** | Multi-services legacy | ✅ Multi-services | âŒ Moins sécurisé |
+| **Azure AD (RBAC)** | Identités permanentes | ✅ Gestion centralisée | Pas pour accès anonyme |
+| **Anonymous Public Access** | Contenu public | ✅ Simple | âŒ Pas sécurisé |
 
-**âš ï¸ Points ClÃ©s pour l'Examen :**
-- âœ… **3 types de SAS** : User Delegation (recommandÃ©), Service, Account
-- âœ… **User Delegation SAS** = Plus sÃ©curisÃ© (Azure AD, pas de clÃ©s)
-- âœ… **Stored Access Policy** = Permet rÃ©vocation des SAS
-- âœ… **5 policies max** par container/share/queue/table
-- âœ… **Expiration obligatoire** pour tous les SAS
-- âœ… **HTTPS uniquement** = Best practice
-- âœ… **Permissions minimales** = Principe du moindre privilÃ¨ge
-- âœ… **sp=r** : Read, **sp=w** : Write, **sp=d** : Delete, **sp=l** : List
-- âœ… **RÃ©vocation** : Supprimer Stored Policy OU rÃ©gÃ©nÃ©rer clÃ© compte
-- âœ… **IP restriction** possible avec paramÃ¨tre `--ip`
-
+**âš ï¸ Points Clés pour l'Examen :**
+- ✅ **3 types de SAS** : User Delegation (recommandé), Service, Account
+- ✅ **User Delegation SAS** = Plus sécurisé (Azure AD, pas de clés)
+- ✅ **Stored Access Policy** = Permet révocation des SAS
+- ✅ **5 policies max** par container/share/queue/table
+- ✅ **Expiration obligatoire** pour tous les SAS
+- ✅ **HTTPS uniquement** = Best practice
+- ✅ **Permissions minimales** = Principe du moindre privilège
+- ✅ **sp=r** : Read, **sp=w** : Write, **sp=d** : Delete, **sp=l** : List
+- ✅ **Révocation** : Supprimer Stored Policy OU régénérer clé compte
+- ✅ **IP restriction** possible avec paramètre `--ip`
