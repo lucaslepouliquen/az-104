@@ -11,6 +11,28 @@ L'examen AZ-104 valide vos compétences en tant qu'administrateur Azure. Il couv
 
 ---
 
+## 🗂️ Navigation du Guide
+
+Ce guide est organisé en **5 sections principales**, chacune découpée en **sous-fichiers** pour faciliter la navigation :
+
+- **📁 [STRUCTURE.md](STRUCTURE.md)** - Vue d'ensemble de la structure des dossiers
+- **🗺️ [NAVIGATION.md](NAVIGATION.md)** - Guide de navigation avec parcours d'apprentissage recommandés
+- **📖 Fichiers originaux** - Les 5 fichiers de sections consolidés sont toujours disponibles
+
+### Accès Rapide par Dossier
+
+| Section | Dossier | Fichiers | Poids Examen |
+|---------|---------|----------|--------------|
+| [Identities & Governance](./section1/) | `section1/` | 6 fichiers | 15-20% |
+| [Storage](./section2/) | `section2/` | 6 fichiers | 15-20% |
+| [Compute](./section3/) | `section3/` | 6 fichiers | 20-25% |
+| [Networking](./section4/) | `section4/` | 6 fichiers | 25-30% |
+| [Monitoring & Backup](./section5/) | `section5/` | 3 fichiers | 10-15% |
+
+Chaque dossier contient un **README.md** avec la liste des sous-fichiers et leur contenu.
+
+---
+
 ## 🎯 Domaines d'examen (Répartition des poids)
 
 ### 1. [Gérer les identités et la gouvernance Azure (15-20%)](section1_identities_governance.md)
