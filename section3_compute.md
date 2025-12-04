@@ -165,9 +165,27 @@ az network nsg rule create \
 **1. Fault Domains (FD) - Domaines de Défaillance**
 - **Définition** : Représente un rack physique dans le datacenter
 - **Contenu** : Serveurs, switch réseau, source d'alimentation partagés
-- **Maximum** : 3 Fault Domains par availability set
+- **Maximum** : 3 Fault Domains par availability set 
 - **Protection** : Panne matérielle (hardware failure, power outage, network switch failure)
 - **Distribution** : Azure répartit automatiquement vos VMs sur les FDs
+
+Régions avec 2 fault domains :
+
+Australie : AustraliaCentral, AustraliaCentral2, australiaeast, australiasoutheast
+Europe : AustriaEast, BelgiumCentral, DenmarkEast, FranceSouth, GermanyNorth, GermanyWestCentral, ItalyNorth
+Asie-Pacifique : eastasia, japanwest, KoreaCentral, KoreaSouth, MalaysiaSouth, MalaysiaWest
+Amériques : BrazilSoutheast, CanadaEast, ChileCentral, MexicoCentral
+Moyen-Orient : IndonesiaCentral, IsraelCentral, IsraelNorthwest
+Inde : JioIndiaCentral, JioIndiaWest
+
+Régions avec 3 fault domains :
+
+East US, East US 2, Central US
+Canada Central
+France Central
+Central India
+Brazil South
+Japan East
 
 **Visualisation des Fault Domains :**
 ```
