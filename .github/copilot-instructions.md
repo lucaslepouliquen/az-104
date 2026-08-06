@@ -12,6 +12,8 @@ Ce repo contient un support de revision AZ-104 en francais, structure par sectio
 - Respecter la structure existante des chapitres et sous-chapitres.
 - Ne pas renommer les fichiers existants sans demande explicite.
 - Conserver la coherence entre les fichiers racine (index, navigation, sections) et les fichiers de section.
+- Faire les modifications en priorite dans les fichiers de sous-section (ex: section1/..., section2/..., etc.), car c'est a ce niveau que le contenu est le plus precis et le plus a jour.
+- N'utiliser les fichiers de synthese racine (ex: section*_*.md, README, index, navigation) que pour propager ou resumer des changements deja faits dans les sous-sections.
 
 ## Regles de contenu
 - Prioriser les services et comportements Azure pertinents pour AZ-104.
