@@ -2,7 +2,7 @@
 
 ## Accès Rapide par Section
 
-### 📁 [Section 1: Identities & Governance](./section1/) (15-20%)
+### 📁 [Section 1: Identities & Governance](./section1/) (20-25%)
 
 | Fichier | Sujet | Points Clés |
 |---------|-------|-------------|
@@ -11,7 +11,7 @@
 | [1.3](./section1/1.3_rbac.md) | RBAC | Roles, Scopes, Assignments |
 | [1.4](./section1/1.4_azure_policy.md) | Azure Policy | Effects (Deny, Audit, DeployIfNotExists) |
 | [1.5](./section1/1.5_management_groups.md) | Management Groups | Hierarchy, Resource Locks |
-| [1.6](./section1/1.6_azure_blueprints.md) | Blueprints | vs ARM vs Policy |
+| [1.6](./section1/1.6_azure_blueprints.md) | Gouvernance historique | Blueprints et alternatives actuelles |
 
 ### 💾 [Section 2: Storage](./section2/) (15-20%)
 
@@ -35,7 +35,7 @@
 | [3.5](./section3/3.5_iac.md) | IaC | **ARM, Bicep, Terraform** |
 | [3.6](./section3/3.6_aks.md) | AKS | Control Plane, Node Pools, Autoscaling |
 
-### 🌐 [Section 4: Networking](./section4/) (25-30%)
+### 🌐 [Section 4: Networking](./section4/) (15-20%)
 
 | Fichier | Sujet | Points Clés |
 |---------|-------|-------------|
@@ -76,9 +76,9 @@ Ordre recommandé pour comprendre les dépendances :
 
 ### 🎓 Parcours Examen (Révision intensive - 8-10 heures)
 Par ordre de poids dans l'examen :
-1. **Section 4** (25-30%) - 3 heures
+1. **Section 4** (15-20%) - 3 heures
 2. **Section 3** (20-25%) - 2.5 heures
-3. **Section 1** (15-20%) - 2 heures
+3. **Section 1** (20-25%) - 2 heures
 4. **Section 2** (15-20%) - 2 heures
 5. **Section 5** (10-15%) - 1.5 heure
 

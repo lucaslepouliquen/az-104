@@ -1,4 +1,4 @@
-# Section 1: Manage Azure Identities and Governance (15-20%)
+# Section 1: Manage Azure Identities and Governance (20-25%)
 
 Ce dossier contient les sous-sections détaillées de la Section 1 du guide AZ-104.
 
@@ -30,11 +30,10 @@ Ce dossier contient les sous-sections détaillées de la Section 1 du guide AZ-1
    - Resource locks
    - Limites et quotas
 
-6. **1.6_azure_blueprints.md** - Azure Blueprints
-   - Architecture
-   - Composants
-   - Lifecycle et versioning
-   - Comparaison avec ARM Templates et Policy
+6. **1.6_azure_blueprints.md** - Gouvernance historique et alternatives
+   - Statut de retrait d'Azure Blueprints
+   - Deployment Stacks et Template Specs
+   - Comparaison avec ARM Templates et Azure Policy
 
 ## Navigation
 
