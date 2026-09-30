@@ -23,10 +23,10 @@ Ce guide est organisé en **5 sections principales**, chacune découpée en **so
 
 | Section | Dossier | Fichiers | Poids Examen |
 |---------|---------|----------|--------------|
-| [Identities & Governance](./section1/) | `section1/` | 6 fichiers | 15-20% |
+| [Identities & Governance](./section1/) | `section1/` | 6 fichiers | 20-25% |
 | [Storage](./section2/) | `section2/` | 6 fichiers | 15-20% |
 | [Compute](./section3/) | `section3/` | 6 fichiers | 20-25% |
-| [Networking](./section4/) | `section4/` | 6 fichiers | 25-30% |
+| [Networking](./section4/) | `section4/` | 6 fichiers | 15-20% |
 | [Monitoring & Backup](./section5/) | `section5/` | 3 fichiers | 10-15% |
 
 Chaque dossier contient un **README.md** avec la liste des sous-fichiers et leur contenu.
@@ -35,7 +35,7 @@ Chaque dossier contient un **README.md** avec la liste des sous-fichiers et leur
 
 ## 🎯 Domaines d'examen (Répartition des poids)
 
-### 1. [Gérer les identités et la gouvernance Azure (15-20%)](section1_identities_governance.md)
+### 1. [Gérer les identités et la gouvernance Azure (20-25%)](section1_identities_governance.md)
 - [Azure Active Directory (Azure AD / Entra ID)](section1_identities_governance.md#11-azure-active-directory-azure-ad)
   - [Concepts Fondamentaux](section1_identities_governance.md#concepts-fondamentaux)
   - [Utilisateurs et Groupes](section1_identities_governance.md#utilisateurs-et-groupes)
@@ -66,7 +66,7 @@ Chaque dossier contient un **README.md** avec la liste des sous-fichiers et leur
 - Container Instances
 - ARM Templates et Infrastructure as Code
 
-### 4. [Configurer et gérer la mise en réseau virtuelle (25-30%)](section4_networking.md)
+### 4. [Configurer et gérer la mise en réseau virtuelle (15-20%)](section4_networking.md)
 - Réseaux virtuels (VNets) et sous-réseaux
 - Groupes de sécurité réseau (NSG)
 - Équilibrage de charge et passerelles d'application

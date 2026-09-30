@@ -1,4 +1,4 @@
-# AZ-104 - Section 1: Manage Azure Identities and Governance (15-20%)
+# AZ-104 - Section 1: Manage Azure Identities and Governance (20-25%)
 
 ## 📑 Table des matières
 
@@ -28,7 +28,7 @@
   - [Hiérarchie](#hiérarchie)
   - [Limites](#limites)
   - [Resource Locks](#resource-locks)
-- [1.6 Azure Blueprints](#16-azure-blueprints)
+- [1.6 Gouvernance historique](#16-gouvernance-historique)
   - [Concepts et Architecture](#concepts-et-architecture)
   - [Composants d'un Blueprint](#composants-dun-blueprint)
   - [Lifecycle et Versioning](#lifecycle-et-versioning)
